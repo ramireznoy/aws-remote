@@ -6,6 +6,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { registerRoutes } = require('./lib/routes');
 const { initializeWebSocket } = require('./lib/websocket/pipeline-monitor');
+const { validateConfigProfile } = require('./lib/config/config');
+
+// Ensure configured AWS profile exists on this machine
+validateConfigProfile();
 
 const app = express();
 const server = http.createServer(app);
