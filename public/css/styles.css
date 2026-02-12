@@ -1,0 +1,173 @@
+/* Remote Control — Custom Styles (only what Tabler doesn't provide)
+
+/* Icon sizes — same convention as RBAC editor */
+.ti:not(.icon-lg):not(.icon-hero):not(.icon-nav) { font-size: 1.1rem; }
+.icon-hero { font-size: 3rem; }
+.icon-nav { font-size: 1.25rem; }
+
+/* --- Environment Selector --- */
+
+.env-select {
+  width: auto;
+  border: none;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.4rem 2rem 0.4rem 0.75rem;
+  letter-spacing: 0.05em;
+  border-radius: var(--tblr-border-radius);
+}
+
+/* --- Repo Dropdown (add-repo search) --- */
+
+.repo-dropdown {
+  max-height: 200px;
+  overflow-y: auto;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+}
+
+/* --- Repo List --- */
+
+.repo-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.repo-item {
+  border-bottom: 1px solid var(--tblr-border-color);
+  padding: 0.75rem 0.25rem;
+}
+
+.repo-item:last-child {
+  border-bottom: none;
+}
+
+.branch-override-input {
+  max-width: 220px;
+}
+
+.branch-badge-default {
+  color: var(--tblr-muted);
+}
+
+/* --- Pipeline Cards --- */
+
+.pipeline-card.status-Succeeded {
+  border-left: 4px solid var(--tblr-success);
+}
+
+.pipeline-card.status-Failed {
+  border-left: 4px solid var(--tblr-danger);
+}
+
+.pipeline-card.status-InProgress {
+  border-left: 4px solid var(--tblr-info);
+}
+
+.pipeline-card.status-Error {
+  border-left: 4px solid var(--tblr-warning);
+}
+
+.pipeline-card.status-Idle {
+  border-left: 4px solid var(--tblr-secondary);
+}
+
+/* --- Execution History Dots --- */
+
+.exec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  cursor: default;
+}
+
+/* --- Stage Indicator --- */
+
+.stage-steps {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.stage-step {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--tblr-border-radius);
+  background: var(--tblr-bg-surface-secondary);
+}
+
+.stage-step.Succeeded {
+  color: var(--tblr-success);
+}
+
+.stage-step.Failed {
+  color: var(--tblr-danger);
+}
+
+.stage-step.InProgress {
+  color: var(--tblr-info);
+}
+
+.stage-arrow {
+  color: var(--tblr-muted);
+}
+
+/* --- Deploy Button --- */
+
+.deploy-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* --- Toast --- */
+
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* --- Status Panel --- */
+
+.scrollable-panel {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+/* --- Notify Modal --- */
+
+.notify-text {
+  background: var(--tblr-bg-surface-secondary);
+  color: var(--tblr-body-color);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+  border: 1px solid var(--tblr-border-color);
+}
+
+/* --- Text Size Utilities --- */
+
+.text-sm { font-size: 0.8rem; }
+.text-xs { font-size: 0.75rem; }
+
+/* --- AWS Credential Status --- */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ti-loader {
+  animation: spin 1s linear infinite;
+}

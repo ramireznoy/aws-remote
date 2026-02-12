@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remote Control</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+
+  <script src="/js/utils/websocket.js"></script>
+  <script src="/js/utils/api.js"></script>
+  <script src="/js/utils/helpers.js"></script>
+  <script type="text/babel" src="/js/components/components.js"></script>
+  <script type="text/babel" src="/js/hooks/use-deploy.js"></script>
+  <script type="text/babel" src="/js/pages/deploy.js"></script>
+  <script type="text/babel" src="/js/pages/settings.js"></script>
+  <script type="text/babel" src="/js/pages/multi-env-deploy.js"></script>
+  <script type="text/babel" src="/js/app.js"></script>
+</body>
+</html>
