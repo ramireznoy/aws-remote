@@ -1,6 +1,6 @@
 // Terminal built-in commands — registry pattern
 // Each command: { name, description, execute(ctx) }
-// ctx provides: { tab, args, templates, getServiceScripts, environment, getServices, appendOutput, updateTab }
+// ctx provides: { tab, args, templates, getServiceScripts, environment, environments, onSwitchEnvironment, getServices, appendOutput, updateTab }
 
 function formatScriptLine(s) {
   return { type: 'command', text: '  ' + s.name.padEnd(20) + (s.description || s.command) };
@@ -124,6 +124,42 @@ var terminalCommands = [
         return;
       }
       ctx.appendOutput([{ type: 'error', text: 'cd: no such service: ' + target }]);
+    },
+  },
+
+  {
+    name: 'venv <env>',
+    description: 'Switch environment (like activating a virtualenv)',
+    execute: function (ctx) {
+      var target = ctx.args.join(' ').trim();
+      if (!target) {
+        // No argument — show current env and list available
+        var lines = [
+          { type: 'success', text: '(' + ctx.environment + ') active' },
+          { type: 'muted', text: '' },
+          { type: 'info', text: 'Available environments:' },
+        ];
+        ctx.environments.forEach(function (e) {
+          var marker = e === ctx.environment ? ' ←' : '';
+          lines.push({ type: 'command', text: '  ' + e + marker });
+        });
+        lines.push({ type: 'muted', text: '' });
+        lines.push({ type: 'muted', text: 'Usage: venv <env>' });
+        ctx.appendOutput(lines);
+        return;
+      }
+      if (!ctx.environments.includes(target)) {
+        ctx.appendOutput([
+          { type: 'error', text: 'venv: unknown environment: ' + target },
+          { type: 'muted', text: 'Available: ' + ctx.environments.join(', ') },
+        ]);
+        return;
+      }
+      if (target === ctx.environment) {
+        ctx.appendOutput([{ type: 'muted', text: '(' + target + ') already active' }]);
+        return;
+      }
+      ctx.onSwitchEnvironment(target);
     },
   },
 ];

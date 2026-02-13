@@ -14,7 +14,7 @@ function createTab(id) {
   };
 }
 
-function RunCommandPage({ environment, config, addToast }) {
+function RunCommandPage({ environment, config, addToast, onSwitchEnvironment }) {
   // Load tabs from localStorage or create default
   const [tabs, setTabs] = React.useState(() => {
     try {
@@ -108,6 +108,8 @@ function RunCommandPage({ environment, config, addToast }) {
       templates,
       getServiceScripts,
       environment,
+      environments: (config && config.environments) || [],
+      onSwitchEnvironment,
       getServices,
       appendOutput: (lines) => appendOutput(tabId, lines),
       updateTab: (updater) => updateTab(tabId, updater),
@@ -222,6 +224,15 @@ function RunCommandPage({ environment, config, addToast }) {
       return getServices()
         .filter((s) => s.toLowerCase().startsWith(partial))
         .map((s) => 'cd ' + s);
+    }
+
+    // Completing argument for venv → environment names
+    if (isTypingArg && parts[0].toLowerCase() === 'venv') {
+      const partial = parts.slice(1).join(' ').toLowerCase();
+      const envs = (config && config.environments) || [];
+      return envs
+        .filter((e) => e.toLowerCase().startsWith(partial))
+        .map((e) => 'venv ' + e);
     }
 
     // Completing first word

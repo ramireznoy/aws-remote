@@ -265,6 +265,7 @@ function App() {
               environment={environment}
               config={config}
               addToast={addToast}
+              onSwitchEnvironment={switchEnvironment}
             />
           </div>
           <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
