@@ -95,107 +95,22 @@ function RunCommandPage({ environment, config, addToast }) {
     return config.repos.map((r) => r.name);
   }
 
-  // Built-in command handlers
+  // Built-in command handler — delegates to terminal-commands.js registry
   function handleBuiltinCommand(tab, cmd, args) {
+    const handler = findTerminalCommand(cmd);
+    if (!handler) return false;
+
     const tabId = tab.id;
-
-    switch (cmd) {
-      case 'help': {
-        appendOutput(tabId, [
-          { type: 'info', text: 'Available commands:' },
-          { type: 'muted', text: '' },
-          { type: 'command', text: '  cd <service>    Navigate into a service' },
-          { type: 'command', text: '  cd ..           Go back to root' },
-          { type: 'command', text: '  ls              List services or command templates' },
-          { type: 'command', text: '  help            Show this help' },
-          { type: 'command', text: '  clear           Clear terminal output' },
-          { type: 'command', text: '  history         Show command history' },
-          { type: 'muted', text: '' },
-          { type: 'info', text: 'Inside a service, any other input runs as a command via Lambda:' },
-          { type: 'command', text: '  npm run migrate' },
-          { type: 'command', text: '  node scripts/seed.js' },
-          { type: 'muted', text: '' },
-          { type: 'muted', text: `Lambda: ${environment}-run-command` },
-        ]);
-        return true;
-      }
-
-      case 'clear': {
-        updateTab(tabId, (t) => ({ ...t, output: [] }));
-        return true;
-      }
-
-      case 'history': {
-        if (!tab.history.length) {
-          appendOutput(tabId, [{ type: 'muted', text: 'No command history' }]);
-        } else {
-          const lines = tab.history.map((h, i) => ({
-            type: 'command',
-            text: `  ${String(i + 1).padStart(4)}  ${h}`,
-          }));
-          appendOutput(tabId, lines);
-        }
-        return true;
-      }
-
-      case 'ls': {
-        const services = getServices();
-        if (!tab.cwd) {
-          // At root — list services
-          if (!services.length) {
-            appendOutput(tabId, [{ type: 'muted', text: 'No services configured. Add repos in Settings.' }]);
-          } else {
-            const lines = services.map((s) => ({ type: 'info', text: '  ' + s }));
-            appendOutput(tabId, lines);
-          }
-        } else {
-          // Inside a service — list templates
-          if (!templates.length) {
-            appendOutput(tabId, [
-              { type: 'muted', text: 'No command templates configured.' },
-              { type: 'muted', text: 'Type any command to run it, e.g.: npm run migrate' },
-            ]);
-          } else {
-            appendOutput(tabId, [{ type: 'info', text: 'Command templates:' }]);
-            const lines = templates.map((t) => ({
-              type: 'command',
-              text: `  ${t.name.padEnd(20)} ${t.description || t.command}`,
-            }));
-            appendOutput(tabId, lines);
-          }
-        }
-        return true;
-      }
-
-      case 'cd': {
-        const target = args.join(' ').trim();
-        if (!target || target === '/') {
-          updateTab(tabId, (t) => ({ ...t, cwd: null }));
-          return true;
-        }
-        if (target === '..' || target === '../') {
-          updateTab(tabId, (t) => ({ ...t, cwd: null }));
-          return true;
-        }
-        const services = getServices();
-        if (services.includes(target)) {
-          updateTab(tabId, (t) => ({ ...t, cwd: target }));
-          return true;
-        }
-        // Fuzzy match — check if any service contains the input
-        const match = services.find((s) => s.includes(target));
-        if (match) {
-          updateTab(tabId, (t) => ({ ...t, cwd: match }));
-          appendOutput(tabId, [{ type: 'muted', text: `→ matched: ${match}` }]);
-          return true;
-        }
-        appendOutput(tabId, [{ type: 'error', text: `cd: no such service: ${target}` }]);
-        return true;
-      }
-
-      default:
-        return false;
-    }
+    handler.execute({
+      tab,
+      args,
+      templates,
+      environment,
+      getServices,
+      appendOutput: (lines) => appendOutput(tabId, lines),
+      updateTab: (updater) => updateTab(tabId, updater),
+    });
+    return true;
   }
 
   async function executeCommand(rawInput) {
@@ -291,7 +206,64 @@ function RunCommandPage({ environment, config, addToast }) {
     }
   }
 
+  function getCompletions(text) {
+    const parts = text.split(/\s+/);
+    const isTypingArg = text.includes(' ');
+
+    // Completing argument for cd → service names
+    if (isTypingArg && parts[0].toLowerCase() === 'cd') {
+      const partial = parts.slice(1).join(' ').toLowerCase();
+      return getServices()
+        .filter((s) => s.toLowerCase().startsWith(partial))
+        .map((s) => 'cd ' + s);
+    }
+
+    // Completing first word
+    if (!isTypingArg) {
+      const partial = text.toLowerCase();
+      const builtins = terminalCommands
+        .map((c) => c.name.split(' ')[0])
+        .filter((n) => n.startsWith(partial));
+      const templateNames = templates
+        .map((t) => t.name)
+        .filter((n) => n.toLowerCase().startsWith(partial));
+      const serviceNames = !activeTab.cwd
+        ? getServices().filter((s) => s.toLowerCase().startsWith(partial)).map((s) => 'cd ' + s)
+        : [];
+      return [...new Set([...builtins, ...templateNames, ...serviceNames])];
+    }
+
+    return [];
+  }
+
   function handleKeyDown(e) {
+    // Tab completion
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (!input.trim()) return;
+      const matches = getCompletions(input);
+      if (matches.length === 1) {
+        setInput(matches[0]);
+      } else if (matches.length > 1) {
+        // Find common prefix
+        let prefix = matches[0];
+        for (let i = 1; i < matches.length; i++) {
+          while (!matches[i].startsWith(prefix)) {
+            prefix = prefix.slice(0, -1);
+          }
+        }
+        if (prefix.length > input.length) {
+          setInput(prefix);
+        } else {
+          appendOutput(activeTab.id, [
+            { type: 'prompt-line', prompt: getPrompt(activeTab), command: input },
+            { type: 'muted', text: matches.join('  ') },
+          ]);
+        }
+      }
+      return;
+    }
+
     if (e.key === 'Enter' && !running) {
       executeCommand(input);
       return;
@@ -408,7 +380,13 @@ function RunCommandPage({ environment, config, addToast }) {
         <div
           className="terminal-output"
           ref={outputRef}
-          onClick={() => inputRef.current && inputRef.current.focus()}
+          onClick={() => {
+            // Only focus input if user didn't select text
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) {
+              inputRef.current && inputRef.current.focus();
+            }
+          }}
         >
           {activeTab.output.map(renderLine)}
         </div>

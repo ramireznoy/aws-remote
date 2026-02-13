@@ -257,6 +257,12 @@
   color: #cdd6f4;
   white-space: pre-wrap;
   word-break: break-word;
+  user-select: text;
+}
+
+.terminal-output ::selection {
+  background: #585b70;
+  color: #cdd6f4;
 }
 
 .terminal-output .line-prompt {

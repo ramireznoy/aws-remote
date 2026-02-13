@@ -1,7 +1,7 @@
 // Root App Component
 
 function App() {
-  const validTabs = ['deploy', 'multi-env', 'terminal', 'settings'];
+  const validTabs = ['deploy', 'multi-env', 'run-command', 'settings'];
 
   function parseRoute(pathname) {
     const parts = pathname.replace(/^\//, '').split('/');
@@ -151,11 +151,11 @@ function App() {
                     <span className="nav-link-title">Multi-Env</span>
                   </a>
                 </li>
-                <li className={`nav-item ${activeTab === 'terminal' ? 'active' : ''}`}>
+                <li className={`nav-item ${activeTab === 'run-command' ? 'active' : ''}`}>
                   <a className="nav-link"
-                    href="/terminal" onClick={(e) => { e.preventDefault(); switchTab('terminal'); }}>
-                    <span className="nav-link-icon"><i className="ti ti-terminal-2"></i></span>
-                    <span className="nav-link-title">Terminal</span>
+                    href="/run-command" onClick={(e) => { e.preventDefault(); switchTab('run-command'); }}>
+                    <span className="nav-link-icon"><i className="ti ti-lambda"></i></span>
+                    <span className="nav-link-title">Run command</span>
                   </a>
                 </li>
                 <li className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}>
@@ -260,7 +260,7 @@ function App() {
               addToast={addToast}
             />
           </div>
-          <div style={{ display: activeTab === 'terminal' ? 'block' : 'none' }}>
+          <div style={{ display: activeTab === 'run-command' ? 'block' : 'none' }}>
             <RunCommandPage
               environment={environment}
               config={config}
