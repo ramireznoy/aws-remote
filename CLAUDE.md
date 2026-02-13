@@ -7,7 +7,7 @@ A web UI for managing AWS CodePipeline deployments across shared UAT environment
 ## Tech Stack
 
 - **Frontend**: React 18 + Tabler UI (v1.0.0-beta20) + Tabler Icons via CDN. Babel standalone for JSX — no bundler, no build step.
-- **Backend**: Node.js + Express. AWS SDK v3 (`@aws-sdk/client-codepipeline`, `@aws-sdk/credential-providers`).
+- **Backend**: Node.js + Express. AWS SDK v3 (`@aws-sdk/client-codepipeline`, `@aws-sdk/client-lambda`, `@aws-sdk/credential-providers`).
 - **Real-time**: Socket.IO for WebSocket-based pipeline status updates (replaces HTTP polling).
 - **Auth**: Local AWS CLI profiles / SSO sessions (fromIni). No credentials stored in the app. On startup, the server validates that the configured `awsProfile` exists in the user's `~/.aws/config` and auto-corrects to the first available profile if not.
 - **Notifications**: Microsoft Teams Workflow webhooks with Adaptive Cards (FactSet format). Browser notifications for pipeline state changes.
@@ -19,6 +19,7 @@ remote-control/
 ├── package.json
 ├── server.js                  # Minimal Express entry point (32 lines)
 ├── config.json                # User-editable: environments, repos, pipeline patterns, AWS config
+├── commands.json              # Command templates for Terminal (name, command, description)
 ├── CLAUDE.md
 ├── lib/                       # Backend modules (organized, testable)
 │   ├── config/
@@ -26,6 +27,7 @@ remote-control/
 │   ├── services/
 │   │   ├── aws-pipeline.js    # AWS CodePipeline operations (getPipelineStatuses, updateBranch, trigger, stop)
 │   │   ├── developer.js       # detectDeveloper (git user.name / OS username)
+│   │   ├── lambda.js          # getLambdaClient, invokeLambda (AWS Lambda invocation)
 │   │   └── teams.js           # buildNotifyText, notifyTeams (MS Teams Adaptive Cards)
 │   ├── routes/
 │   │   ├── index.js           # registerRoutes (imports all route modules)
@@ -34,7 +36,8 @@ remote-control/
 │   │   ├── credentials.js     # GET /api/validate-credentials
 │   │   ├── pipelines.js       # GET /api/pipelines/:env, GET /api/status
 │   │   ├── deploy.js          # POST /api/deploy, POST /api/notify-message
-│   │   └── actions.js         # POST /api/trigger, POST /api/stop
+│   │   ├── actions.js         # POST /api/trigger, POST /api/stop
+│   │   └── run-command.js     # POST /api/run-command, GET/PUT /api/command-templates
 │   └── websocket/
 │       └── pipeline-monitor.js # initializeWebSocket, subscription tracking, polling (5s interval)
 └── public/
@@ -49,6 +52,7 @@ remote-control/
         ├── pages/
         │   ├── deploy.js      # Single-env deploy UI: branch input, repo checklist, pipeline status cards
         │   ├── multi-env-deploy.js # Multi-env deploy UI: deploy same branch to multiple environments
+        │   ├── run-command.js # Terminal: virtual CLI for running commands on services via Lambda
         │   └── settings.js    # Settings: AWS config, Teams webhook, repo/pipeline pattern management
         └── utils/
             ├── api.js         # Fetch helper (plain JS, no JSX)
@@ -62,8 +66,8 @@ remote-control/
 - **Tabler-first CSS**: Only add custom styles when Tabler genuinely doesn't provide what's needed. Never override Tabler defaults for sizing, spacing, or typography.
 - **Icon sizing** (3 tiers from RBAC editor): `.ti` default 1.1rem, `.icon-nav` 1.25rem, `.icon-hero` 3rem.
 - **Navbar** matches RBAC editor exactly: `navbar-toggler`, `navbar-brand-autodark`, `collapse navbar-collapse` with id, `nav-link-icon`/`nav-link-title`.
-- **Routing**: pushState-based (no React Router). `parseRoute()` in app.js, `popstate` listener. Three routes: `/deploy`, `/multi-env`, `/settings`.
-- **Three-page design**: Deploy (single environment), Multi-Env (deploy to multiple environments), Settings (AWS config, repos, webhooks).
+- **Routing**: pushState-based (no React Router). `parseRoute()` in app.js, `popstate` listener. Four routes: `/deploy`, `/multi-env`, `/terminal`, `/settings`.
+- **Four-page design**: Deploy (single environment), Multi-Env (deploy to multiple environments), Terminal (virtual CLI for Lambda commands), Settings (AWS config, repos, webhooks).
 - **Config `{env}` placeholder**: Pipeline names in config.json use `{env}` which gets replaced at runtime (e.g., `{env}-user-service` → `uat1-user-service`).
 - **Input sizing**: All form controls use default Tabler size (no `form-control-sm` or `form-select-sm`).
 - **Developer name**: Auto-detected from `git config user.name` / OS username. Not stored in config.
@@ -81,6 +85,9 @@ remote-control/
 | POST | `/api/trigger` | Trigger (re-run) a single pipeline without changing branch |
 | POST | `/api/stop` | Stop a running pipeline execution |
 | GET | `/api/status` | Get pipeline execution status (fallback for WebSocket initial load) |
+| POST | `/api/run-command` | Invoke `{env}-run-command` Lambda with target service + command |
+| GET | `/api/command-templates` | Return commands.json templates |
+| PUT | `/api/command-templates` | Update commands.json templates |
 
 ## WebSocket Events
 

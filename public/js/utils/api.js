@@ -25,5 +25,8 @@ var api = (function () {
     stopPipeline: (pipelineName, executionId) => request('POST', '/api/stop', { pipelineName, executionId }),
     getStatus: (pipelineNames) =>
       request('GET', '/api/status?pipelines=' + pipelineNames.map(encodeURIComponent).join(',')),
+    runCommand: (payload) => request('POST', '/api/run-command', payload),
+    getCommandTemplates: () => request('GET', '/api/command-templates'),
+    saveCommandTemplates: (data) => request('PUT', '/api/command-templates', data),
   };
 })();

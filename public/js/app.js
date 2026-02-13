@@ -1,7 +1,7 @@
 // Root App Component
 
 function App() {
-  const validTabs = ['deploy', 'multi-env', 'settings'];
+  const validTabs = ['deploy', 'multi-env', 'terminal', 'settings'];
 
   function parseRoute(pathname) {
     const parts = pathname.replace(/^\//, '').split('/');
@@ -151,6 +151,13 @@ function App() {
                     <span className="nav-link-title">Multi-Env</span>
                   </a>
                 </li>
+                <li className={`nav-item ${activeTab === 'terminal' ? 'active' : ''}`}>
+                  <a className="nav-link"
+                    href="/terminal" onClick={(e) => { e.preventDefault(); switchTab('terminal'); }}>
+                    <span className="nav-link-icon"><i className="ti ti-terminal-2"></i></span>
+                    <span className="nav-link-title">Terminal</span>
+                  </a>
+                </li>
                 <li className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}>
                   <a className="nav-link"
                     href="/settings" onClick={(e) => { e.preventDefault(); switchTab('settings'); }}>
@@ -249,6 +256,13 @@ function App() {
           </div>
           <div style={{ display: activeTab === 'multi-env' ? 'block' : 'none' }}>
             <MultiEnvDeploy
+              config={config}
+              addToast={addToast}
+            />
+          </div>
+          <div style={{ display: activeTab === 'terminal' ? 'block' : 'none' }}>
+            <RunCommandPage
+              environment={environment}
               config={config}
               addToast={addToast}
             />
