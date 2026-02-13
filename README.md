@@ -80,20 +80,32 @@ The file should look like this:
 {
   "awsProfile": "your-aws-profile-name",
   "awsRegion": "us-east-1",
-  "teamsWebhook": "https://your-teams-webhook-url.com/...",
+  "teamsWebhookUrl": "https://your-teams-webhook-url.com/...",
+  "pollIntervalMs": 5000,
   "environments": ["uat1", "uat2", "uat3", "uat4", "uat5"],
+  "commandTemplates": [
+    {
+      "name": "migrate:run",
+      "command": "php artisan migrate:run",
+      "description": "Run database migrations"
+    }
+  ],
   "repos": [
     {
       "name": "user-service",
-      "pipelineName": "{env}-user-service"
+      "pipelineName": "{env}-user-service",
+      "scripts": [
+        {
+          "name": "seed",
+          "command": "php artisan db:seed",
+          "description": "Seed the database"
+        }
+      ]
     },
     {
       "name": "order-service",
-      "pipelineName": "{env}-order-service"
-    },
-    {
-      "name": "payment-service",
-      "pipelineName": "{env}-payment-service"
+      "pipelineName": "{env}-order-service",
+      "scripts": []
     }
   ]
 }
@@ -105,9 +117,12 @@ The file should look like this:
 |-------|-------------|----------|
 | `awsProfile` | AWS CLI profile name to use for authentication | Yes |
 | `awsRegion` | AWS region where your pipelines are located | Yes |
-| `teamsWebhook` | Microsoft Teams webhook URL for notifications | No |
+| `pollIntervalMs` | How often to check pipeline status (ms, default 5000) | No |
+| `teamsWebhookUrl` | Microsoft Teams webhook URL for notifications | No |
 | `environments` | List of environment names (e.g., uat1, uat2) | Yes |
-| `repos` | Array of repositories and their pipeline mappings | Yes |
+| `commandTemplates` | Global commands available in all services via Terminal | No |
+| `repos` | Array of repositories with pipeline mappings and scripts | Yes |
+| `repos[].scripts` | Per-repo scripts available when inside that service in Terminal | No |
 
 ### Understanding Pipeline Name Patterns
 
@@ -187,15 +202,35 @@ Deploy the same branch to multiple environments simultaneously:
 
 All selected pipelines will be triggered in parallel across all selected environments.
 
-### 3. **Settings Page**
+### 3. **Terminal Page** (Virtual CLI)
 
-Configure Remote Control:
-- Switch AWS profiles
-- Update AWS region
-- Add/edit/delete repository mappings
-- Set Microsoft Teams webhook URL
+Run commands on remote services via AWS Lambda:
 
-Changes are saved to `config.json` automatically.
+1. **Select an environment** from the dropdown
+2. **Navigate into a service** with `cd service-name` (tab-completion supported)
+3. **Run scripts** defined for that service, or type any command directly
+4. **Use global commands** available across all services (e.g., `migrate:run`)
+
+**Built-in commands:**
+- `help` — Show available commands and global templates
+- `ls` — List services (at root) or per-service scripts (inside a service)
+- `cd <service>` — Navigate into a service (supports partial matching)
+- `clear` — Clear terminal output
+- `history` — Show command history
+
+**Script shortcuts:** Type a script name (e.g., `migrate:run`) and it resolves to the full command (e.g., `php artisan migrate:run`). Extra arguments are appended: `migrate:run --force` becomes `php artisan migrate:run --force`.
+
+### 4. **Settings Page**
+
+Configure Remote Control with a repo-centric layout:
+- **AWS Configuration**: Switch profiles, set region, adjust poll interval
+- **Global Command Templates**: Commands available in all services via Terminal
+- **Repositories**: Expandable cards showing pipeline pattern + per-repo scripts
+  - Add/edit/remove scripts per repo with inline editing
+  - Edit repo name and pipeline pattern
+- **Teams Notifications**: Set webhook URL
+
+All deletions require confirmation. Changes are saved to `config.json` automatically.
 
 ---
 
@@ -307,7 +342,8 @@ WebSocket support is required for real-time updates.
 - **UI Framework**: Tabler UI v1.0.0-beta20 + Tabler Icons
 - **Real-time**: WebSocket via Socket.IO client
 - **File Structure**:
-  - `pages/` - Three main views (deploy, multi-env-deploy, settings)
+  - `pages/` - Four main views (deploy, multi-env-deploy, run-command, settings)
+  - `commands/` - Terminal built-in command registry (help, clear, history, ls, cd)
   - `components/` - Reusable UI components (shared across pages)
   - `utils/` - API client, WebSocket wrapper, helper functions
   - `hooks/` - Custom React hooks (useDeploy for state management)
@@ -346,6 +382,10 @@ No database, no authentication layer, no build step — just you, your AWS crede
 - ✅ Microsoft Teams notifications
 - ✅ Pipeline trigger/stop actions
 - ✅ Per-repo branch overrides
+- ✅ Terminal: virtual CLI for running commands on services via Lambda
+- ✅ Per-repo scripts and global command templates
+- ✅ Tab-completion for commands, services, and scripts
+- ✅ Repo-centric settings with expandable cards and inline editing
 - ✅ Dark mode support
 - ✅ AWS credential validation
 
@@ -358,8 +398,7 @@ No database, no authentication layer, no build step — just you, your AWS crede
 - 🔄 Pipeline execution history view
 - 📊 Deployment analytics and metrics
 - 🔍 Advanced filtering and search
-- 📝 Lambda function invocation with streaming logs
-- 🖥️ SSH/shell command execution with real-time output
+- 📝 Streaming Lambda logs in Terminal
 - 👥 Multi-user collaboration features
 - 📱 Mobile-responsive improvements
 

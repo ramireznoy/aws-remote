@@ -35,16 +35,17 @@ function RunCommandPage({ environment, config, addToast }) {
 
   const [input, setInput] = React.useState('');
   const [running, setRunning] = React.useState(false);
-  const [templates, setTemplates] = React.useState([]);
   const outputRef = React.useRef(null);
   const inputRef = React.useRef(null);
 
-  // Load command templates on mount
-  React.useEffect(() => {
-    api.getCommandTemplates()
-      .then((data) => setTemplates(data.templates || []))
-      .catch(() => {});
-  }, []);
+  // Derive templates and per-service scripts from config
+  const templates = (config && config.commandTemplates) || [];
+
+  function getServiceScripts(serviceName) {
+    if (!config || !config.repos) return [];
+    const repo = config.repos.find((r) => r.name === serviceName);
+    return (repo && repo.scripts) || [];
+  }
 
   // Persist tabs to localStorage
   React.useEffect(() => {
@@ -105,6 +106,7 @@ function RunCommandPage({ environment, config, addToast }) {
       tab,
       args,
       templates,
+      getServiceScripts,
       environment,
       getServices,
       appendOutput: (lines) => appendOutput(tabId, lines),
@@ -136,9 +138,13 @@ function RunCommandPage({ environment, config, addToast }) {
     const cmd = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    // Check if it's a template shortcut
-    const template = templates.find((t) => t.name === cmd);
-    const resolvedCommand = template ? template.command : trimmed;
+    // Check if it's a per-service script or global template shortcut
+    const currentScripts = activeTab.cwd ? getServiceScripts(activeTab.cwd) : [];
+    const script = currentScripts.find((s) => s.name === cmd);
+    const template = !script ? templates.find((t) => t.name === cmd) : null;
+    const extraArgs = args.join(' ');
+    const base = script ? script.command : template ? template.command : null;
+    const resolvedCommand = base ? (extraArgs ? base + ' ' + extraArgs : base) : trimmed;
 
     // Try built-in commands first
     if (handleBuiltinCommand(activeTab, cmd, args)) {
@@ -227,14 +233,29 @@ function RunCommandPage({ environment, config, addToast }) {
       const templateNames = templates
         .map((t) => t.name)
         .filter((n) => n.toLowerCase().startsWith(partial));
+      // Per-service scripts when inside a service
+      const currentScripts = activeTab.cwd ? getServiceScripts(activeTab.cwd) : [];
+      const scriptNames = currentScripts
+        .map((s) => s.name)
+        .filter((n) => n.toLowerCase().startsWith(partial));
       const serviceNames = !activeTab.cwd
         ? getServices().filter((s) => s.toLowerCase().startsWith(partial)).map((s) => 'cd ' + s)
         : [];
-      return [...new Set([...builtins, ...templateNames, ...serviceNames])];
+      return [...new Set([...builtins, ...scriptNames, ...templateNames, ...serviceNames])];
     }
 
     return [];
   }
+
+  // Auto-resize textarea to fit content
+  function autoResize() {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  React.useEffect(autoResize, [input]);
 
   function handleKeyDown(e) {
     // Tab completion
@@ -264,7 +285,9 @@ function RunCommandPage({ environment, config, addToast }) {
       return;
     }
 
-    if (e.key === 'Enter' && !running) {
+    // Enter executes, Shift+Enter adds newline
+    if (e.key === 'Enter' && !e.shiftKey && !running) {
+      e.preventDefault();
       executeCommand(input);
       return;
     }
@@ -376,12 +399,11 @@ function RunCommandPage({ environment, config, addToast }) {
           </button>
         </div>
 
-        {/* Output area */}
+        {/* Output + inline input */}
         <div
           className="terminal-output"
           ref={outputRef}
           onClick={() => {
-            // Only focus input if user didn't select text
             const selection = window.getSelection();
             if (!selection || selection.isCollapsed) {
               inputRef.current && inputRef.current.focus();
@@ -389,27 +411,28 @@ function RunCommandPage({ environment, config, addToast }) {
           }}
         >
           {activeTab.output.map(renderLine)}
-        </div>
 
-        {/* Input row */}
-        <div className="terminal-input-row">
-          {running && (
-            <span className="terminal-spinner">
-              <i className="ti ti-loader" />
-            </span>
-          )}
-          <span className="terminal-prompt">{getPrompt(activeTab)}</span>
-          <input
-            ref={inputRef}
-            className="terminal-input"
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={running ? 'Running...' : 'Type a command...'}
-            disabled={running}
-            autoFocus
-          />
+          {/* Inline prompt + input */}
+          <div className="terminal-input-line">
+            {running && (
+              <span className="terminal-spinner">
+                <i className="ti ti-loader" />
+              </span>
+            )}
+            <span className="line-prompt">{getPrompt(activeTab)} </span>
+            <textarea
+              ref={inputRef}
+              className="terminal-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              placeholder={running ? 'Running...' : ''}
+              disabled={running}
+              autoFocus
+              spellCheck={false}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -18,8 +18,7 @@ A web UI for managing AWS CodePipeline deployments across shared UAT environment
 remote-control/
 ├── package.json
 ├── server.js                  # Minimal Express entry point (32 lines)
-├── config.json                # User-editable: environments, repos, pipeline patterns, AWS config
-├── commands.json              # Command templates for Terminal (name, command, description)
+├── config.json                # User-editable: environments, repos, pipeline patterns, scripts, AWS config
 ├── CLAUDE.md
 ├── lib/                       # Backend modules (organized, testable)
 │   ├── config/
@@ -37,7 +36,7 @@ remote-control/
 │   │   ├── pipelines.js       # GET /api/pipelines/:env, GET /api/status
 │   │   ├── deploy.js          # POST /api/deploy, POST /api/notify-message
 │   │   ├── actions.js         # POST /api/trigger, POST /api/stop
-│   │   └── run-command.js     # POST /api/run-command, GET/PUT /api/command-templates
+│   │   └── run-command.js     # POST /api/run-command
 │   └── websocket/
 │       └── pipeline-monitor.js # initializeWebSocket, subscription tracking, polling (5s interval)
 └── public/
@@ -45,15 +44,17 @@ remote-control/
     ├── css/styles.css         # Custom styles (only what Tabler doesn't provide)
     └── js/
         ├── app.js             # Root component: routing, navbar, theme toggle, credential validation
+        ├── commands/
+        │   └── terminal-commands.js # Terminal built-in commands registry (help, clear, history, ls, cd)
         ├── components/
-        │   └── components.js  # Reusable UI: Toast, Modal, StatusBadge, StageIndicator, PageHeader, etc.
+        │   └── components.js  # Reusable UI: Toast, Modal, ConfirmModal, StatusBadge, StageIndicator, etc.
         ├── hooks/
         │   └── use-deploy.js  # Deploy state hook: branches, overrides, WebSocket subscriptions
         ├── pages/
         │   ├── deploy.js      # Single-env deploy UI: branch input, repo checklist, pipeline status cards
         │   ├── multi-env-deploy.js # Multi-env deploy UI: deploy same branch to multiple environments
-        │   ├── run-command.js # Terminal: virtual CLI for running commands on services via Lambda
-        │   └── settings.js    # Settings: AWS config, Teams webhook, repo/pipeline pattern management
+        │   ├── run-command.js # Terminal: virtual CLI with tabs, tab-completion, per-service scripts
+        │   └── settings.js    # Settings: AWS config, repos with scripts, global commands, Teams webhook
         └── utils/
             ├── api.js         # Fetch helper (plain JS, no JSX)
             ├── websocket.js   # WebSocket client wrapper for Socket.IO (event bus pattern)
@@ -69,6 +70,9 @@ remote-control/
 - **Routing**: pushState-based (no React Router). `parseRoute()` in app.js, `popstate` listener. Four routes: `/deploy`, `/multi-env`, `/terminal`, `/settings`.
 - **Four-page design**: Deploy (single environment), Multi-Env (deploy to multiple environments), Terminal (virtual CLI for Lambda commands), Settings (AWS config, repos, webhooks).
 - **Config `{env}` placeholder**: Pipeline names in config.json use `{env}` which gets replaced at runtime (e.g., `{env}-user-service` → `uat1-user-service`).
+- **Single source of truth**: All configuration lives in `config.json` — environments, repos, per-repo scripts, global command templates, AWS settings, and Teams webhook. No separate command files.
+- **Terminal command registry**: Built-in commands (help, clear, history, ls, cd) are defined in `terminal-commands.js` as a registry array. Each command is `{ name, description, execute(ctx) }`. The `ls` command shows per-service scripts only; `help` shows both built-in commands and global command templates.
+- **Per-repo scripts vs global commands**: Each repo in config can have a `scripts` array (shown via `ls` inside that service). Global `commandTemplates` are available in all services (shown via `help`). Both support tab-completion and accept extra CLI arguments appended to the resolved command.
 - **Input sizing**: All form controls use default Tabler size (no `form-control-sm` or `form-select-sm`).
 - **Developer name**: Auto-detected from `git config user.name` / OS username. Not stored in config.
 
@@ -86,8 +90,7 @@ remote-control/
 | POST | `/api/stop` | Stop a running pipeline execution |
 | GET | `/api/status` | Get pipeline execution status (fallback for WebSocket initial load) |
 | POST | `/api/run-command` | Invoke `{env}-run-command` Lambda with target service + command |
-| GET | `/api/command-templates` | Return commands.json templates |
-| PUT | `/api/command-templates` | Update commands.json templates |
+| POST | `/api/notify-message` | Preview the Teams notification message for a deploy |
 
 ## WebSocket Events
 

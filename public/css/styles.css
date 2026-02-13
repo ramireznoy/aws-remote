@@ -289,21 +289,9 @@
   color: #a6e3a1;
 }
 
-.terminal-input-row {
+.terminal-input-line {
   display: flex;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid #313244;
-  background: #181825;
-  flex-shrink: 0;
-}
-
-.terminal-prompt {
-  color: #a6e3a1;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  margin-right: 0.5rem;
+  align-items: flex-start;
 }
 
 .terminal-input {
@@ -314,7 +302,12 @@
   color: #cdd6f4;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 0.85rem;
+  line-height: 1.5;
   caret-color: #f5e0dc;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
 }
 
 .terminal-input::placeholder {

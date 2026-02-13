@@ -1,6 +1,10 @@
 // Terminal built-in commands — registry pattern
 // Each command: { name, description, execute(ctx) }
-// ctx provides: { tab, appendOutput, updateTab, getServices, templates, environment }
+// ctx provides: { tab, args, templates, getServiceScripts, environment, getServices, appendOutput, updateTab }
+
+function formatScriptLine(s) {
+  return { type: 'command', text: '  ' + s.name.padEnd(20) + (s.description || s.command) };
+}
 
 var terminalCommands = [
   {
@@ -14,12 +18,24 @@ var terminalCommands = [
       terminalCommands.forEach(function (cmd) {
         lines.push({ type: 'command', text: '  ' + cmd.name.padEnd(16) + cmd.description });
       });
-      if (ctx.templates.length) {
-        lines.push({ type: 'muted', text: '' });
-        lines.push({ type: 'info', text: 'Command templates (run inside a service):' });
-        ctx.templates.forEach(function (t) {
-          lines.push({ type: 'command', text: '  ' + t.name.padEnd(20) + (t.description || t.command) });
-        });
+      if (ctx.tab.cwd) {
+        var serviceScripts = ctx.getServiceScripts(ctx.tab.cwd);
+        if (serviceScripts.length) {
+          lines.push({ type: 'muted', text: '' });
+          lines.push({ type: 'info', text: 'Scripts for ' + ctx.tab.cwd + ':' });
+          serviceScripts.forEach(function (s) { lines.push(formatScriptLine(s)); });
+        }
+        if (ctx.templates.length) {
+          lines.push({ type: 'muted', text: '' });
+          lines.push({ type: 'info', text: 'Global commands:' });
+          ctx.templates.forEach(function (s) { lines.push(formatScriptLine(s)); });
+        }
+      } else {
+        if (ctx.templates.length) {
+          lines.push({ type: 'muted', text: '' });
+          lines.push({ type: 'info', text: 'Global commands (run inside any service):' });
+          ctx.templates.forEach(function (t) { lines.push(formatScriptLine(t)); });
+        }
       }
       lines.push({ type: 'muted', text: '' });
       lines.push({ type: 'info', text: 'Inside a service, any input runs as a command via Lambda.' });
@@ -53,28 +69,32 @@ var terminalCommands = [
 
   {
     name: 'ls',
-    description: 'List services or command templates',
+    description: 'List services or available scripts',
     execute: function (ctx) {
       var services = ctx.getServices();
       if (!ctx.tab.cwd) {
+        // At root — list services with script count
         if (!services.length) {
           ctx.appendOutput([{ type: 'muted', text: 'No services configured. Add repos in Settings.' }]);
         } else {
-          ctx.appendOutput(services.map(function (s) { return { type: 'info', text: '  ' + s }; }));
-        }
-      } else {
-        if (!ctx.templates.length) {
-          ctx.appendOutput([
-            { type: 'muted', text: 'No command templates configured.' },
-            { type: 'muted', text: 'Type any command to run it, e.g.: npm run migrate' },
-          ]);
-        } else {
-          var lines = [{ type: 'info', text: 'Command templates:' }];
-          ctx.templates.forEach(function (t) {
-            lines.push({ type: 'command', text: '  ' + t.name.padEnd(20) + (t.description || t.command) });
+          var lines = services.map(function (s) {
+            var count = ctx.getServiceScripts(s).length;
+            var suffix = count ? '  (' + count + ' scripts)' : '';
+            return { type: 'info', text: '  ' + s + suffix };
           });
           ctx.appendOutput(lines);
         }
+      } else {
+        // Inside a service — show per-service scripts only
+        var serviceScripts = ctx.getServiceScripts(ctx.tab.cwd);
+        var lines = [];
+        if (serviceScripts.length) {
+          serviceScripts.forEach(function (s) { lines.push(formatScriptLine(s)); });
+        } else {
+          lines.push({ type: 'muted', text: 'No scripts configured for this service.' });
+          lines.push({ type: 'muted', text: 'Type any command to run it directly.' });
+        }
+        ctx.appendOutput(lines);
       }
     },
   },
