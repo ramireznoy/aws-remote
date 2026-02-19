@@ -87,7 +87,7 @@
     }
   ],
   "awsRegion": "us-east-1",
-  "awsProfile": "agentic-dev",
+  "awsProfile": "uat",
   "pollIntervalMs": 5000,
   "teamsWebhookUrl": ""
 }
