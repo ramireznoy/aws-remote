@@ -205,10 +205,25 @@ function RunCommandPage({ environment, config, addToast, onSwitchEnvironment }) 
     }
   }
 
+  function deepParseJson(val) {
+    if (typeof val === 'string') {
+      try { return deepParseJson(JSON.parse(val)); } catch { return val; }
+    }
+    if (Array.isArray(val)) return val.map(deepParseJson);
+    if (val && typeof val === 'object') {
+      const out = {};
+      for (const k of Object.keys(val)) out[k] = deepParseJson(val[k]);
+      return out;
+    }
+    return val;
+  }
+
   function formatPayload(payload) {
-    if (typeof payload === 'string') return payload;
+    if (typeof payload === 'string') {
+      try { payload = JSON.parse(payload); } catch { return payload; }
+    }
     try {
-      return JSON.stringify(payload, null, 2);
+      return JSON.stringify(deepParseJson(payload), null, 2);
     } catch {
       return String(payload);
     }
@@ -218,12 +233,15 @@ function RunCommandPage({ environment, config, addToast, onSwitchEnvironment }) 
     const parts = text.split(/\s+/);
     const isTypingArg = text.includes(' ');
 
-    // Completing argument for cd → service names
+    // Completing argument for cd → service names (supports cd ../partial)
     if (isTypingArg && parts[0].toLowerCase() === 'cd') {
-      const partial = parts.slice(1).join(' ').toLowerCase();
+      const arg = parts.slice(1).join(' ');
+      const isRelative = arg.startsWith('../');
+      const partial = (isRelative ? arg.slice(3) : arg).toLowerCase();
+      const prefix = isRelative ? 'cd ../' : 'cd ';
       return getServices()
         .filter((s) => s.toLowerCase().startsWith(partial))
-        .map((s) => 'cd ' + s);
+        .map((s) => prefix + s);
     }
 
     // Completing argument for venv → environment names

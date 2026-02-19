@@ -112,6 +112,10 @@ var terminalCommands = [
         ctx.updateTab(function (t) { return Object.assign({}, t, { cwd: null }); });
         return;
       }
+      // cd ../other-service — go up then into another service
+      if (target.startsWith('../')) {
+        target = target.slice(3).trim();
+      }
       var services = ctx.getServices();
       if (services.includes(target)) {
         ctx.updateTab(function (t) { return Object.assign({}, t, { cwd: target }); });
