@@ -9,7 +9,7 @@ A web UI for managing AWS CodePipeline deployments across shared UAT environment
 - **Frontend**: React 18 + Tabler UI (v1.0.0-beta20) + Tabler Icons via CDN. Babel standalone for JSX — no bundler, no build step.
 - **Backend**: Node.js + Express. AWS SDK v3 (`@aws-sdk/client-codepipeline`, `@aws-sdk/client-lambda`, `@aws-sdk/credential-providers`).
 - **Real-time**: Socket.IO for WebSocket-based pipeline status updates (replaces HTTP polling).
-- **Auth**: Local AWS CLI profiles / SSO sessions (fromIni). No credentials stored in the app. On startup, the server validates that the configured `awsProfile` exists in the user's `~/.aws/config` and auto-corrects to the first available profile if not.
+- **Auth**: Local AWS CLI profiles / SSO sessions (fromSSO). No credentials stored in the app. On startup, the server validates that the configured `awsProfile` exists in the user's `~/.aws/config` and auto-corrects to the first available profile if not.
 - **Notifications**: Microsoft Teams Workflow webhooks with Adaptive Cards (FactSet format). Browser notifications for pipeline state changes.
 
 ## Project Structure

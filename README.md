@@ -352,7 +352,7 @@ WebSocket support is required for real-time updates.
 - **Node.js + Express** (minimal server entry point - 32 lines)
 - **Socket.IO** for WebSocket real-time updates
 - **AWS SDK v3**: `@aws-sdk/client-codepipeline`
-- **Auth**: Local AWS CLI profiles (fromIni) - no credentials stored
+- **Auth**: Local AWS CLI profiles (fromSSO) - no credentials stored
 - **Organized Structure**:
   - `lib/config/` - Configuration management and AWS client factory
   - `lib/services/` - Business logic (AWS operations, Teams notifications, developer detection)

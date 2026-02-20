@@ -13,7 +13,7 @@ function App() {
   const [activeTab, setActiveTab] = React.useState(initial.tab);
   const [environment, setEnvironment] = React.useState(() => localStorage.getItem('rc-environment'));
   const [config, setConfig] = React.useState(null);
-  const [profiles, setProfiles] = React.useState(['default']);
+  const [profiles, setProfiles] = React.useState([{ name: 'default', region: null }]);
   const [toasts, setToasts] = React.useState([]);
   const [dark, setDark] = React.useState(() => localStorage.getItem('rc-theme') === 'dark');
   const [credentialStatus, setCredentialStatus] = React.useState({ status: 'loading', profile: null, error: null });
@@ -84,9 +84,14 @@ function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  async function switchToProfile(profile) {
+  async function switchToProfile(profileName) {
     if (!config) return;
-    const updated = { ...config, awsProfile: profile };
+    const profileData = profiles.find((p) => p.name === profileName);
+    const updated = {
+      ...config,
+      awsProfile: profileName,
+      ...(profileData?.region ? { awsRegion: profileData.region } : {}),
+    };
     setConfig(updated);
 
     try {
@@ -96,7 +101,7 @@ function App() {
       const data = await api.validateCredentials();
       setCredentialStatus({ status: 'valid', profile: data.profile, error: null });
     } catch (err) {
-      setCredentialStatus({ status: 'invalid', profile: profile, error: err.message });
+      setCredentialStatus({ status: 'invalid', profile: profileName, error: err.message });
     }
   }
 

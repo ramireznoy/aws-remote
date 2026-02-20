@@ -371,7 +371,7 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
                   }}
                 >
                   {profiles.map((p) => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p.name} value={p.name}>{p.name}</option>
                   ))}
                 </select>
                 {credentialStatus?.status === 'invalid' && (

@@ -17,6 +17,21 @@
       "name": "tenant:migrate",
       "command": "php artisan tenant:migrate",
       "description": "Run tenant migrations"
+    },
+    {
+      "name": "route:list",
+      "command": "php artisan route:list",
+      "description": "List all Laravel routes"
+    },
+    {
+      "name": "route:cache",
+      "command": "php artisan route:cache",
+      "description": "Rebuilds Laravel route cache"
+    },
+    {
+      "name": "config:cache",
+      "command": "php artisan config:cache",
+      "description": "Rebuilds Laravel config cache"
     }
   ],
   "repos": [
@@ -86,8 +101,8 @@
       "scripts": []
     }
   ],
-  "awsRegion": "us-east-1",
-  "awsProfile": "uat",
+  "awsRegion": "us-gov-east-1",
+  "awsProfile": "nfip-uat",
   "pollIntervalMs": 5000,
   "teamsWebhookUrl": ""
 }
