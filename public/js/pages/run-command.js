@@ -39,7 +39,7 @@ function RunCommandPage({ environment, config, addToast, onSwitchEnvironment }) 
   const inputRef = React.useRef(null);
 
   // Derive templates and per-service scripts from config
-  const templates = (config && config.commandTemplates) || [];
+  const templates = (config && config.commandAliases) || [];
 
   function getServiceScripts(serviceName) {
     if (!config || !config.repos) return [];
@@ -249,8 +249,8 @@ function RunCommandPage({ environment, config, addToast, onSwitchEnvironment }) 
       const partial = parts.slice(1).join(' ').toLowerCase();
       const envs = (config && config.environments) || [];
       return envs
-        .filter((e) => e.toLowerCase().startsWith(partial))
-        .map((e) => 'venv ' + e);
+        .filter((e) => e.name.toLowerCase().startsWith(partial))
+        .map((e) => 'venv ' + e.name);
     }
 
     // Completing first word

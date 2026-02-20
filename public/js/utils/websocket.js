@@ -76,10 +76,10 @@ var WebSocketClient = (function () {
     socket.emit(eventType, data);
   }
 
-  function subscribePipelines(pipelineNames) {
+  function subscribePipelines(pipelineNames, environment) {
     if (!pipelineNames || !pipelineNames.length) return;
-    console.log('→ Subscribing to pipelines:', pipelineNames);
-    emit('pipeline:subscribe', { pipelines: pipelineNames });
+    console.log('→ Subscribing to pipelines:', pipelineNames, '(env:', environment, ')');
+    emit('pipeline:subscribe', { pipelines: pipelineNames, environment });
   }
 
   function unsubscribePipelines(pipelineNames) {

@@ -50,8 +50,8 @@ function App() {
   // Once config loads, ensure we have a valid environment
   React.useEffect(() => {
     if (!config) return;
-    if (environment && config.environments.includes(environment)) return;
-    if (config.environments.length) setEnvironment(config.environments[0]);
+    if (environment && config.environments.some((e) => e.name === environment)) return;
+    if (config.environments.length) setEnvironment(config.environments[0].name);
   }, [config]);
 
   // Persist environment to localStorage
@@ -94,9 +94,12 @@ function App() {
     };
     setConfig(updated);
 
+    // Switch to first environment matching the new profile
+    const matchingEnv = updated.environments.find((e) => e.awsProfile === profileName);
+    if (matchingEnv) setEnvironment(matchingEnv.name);
+
     try {
       await api.saveConfig(updated);
-      // Validate credentials after switching profile
       setCredentialStatus({ status: 'loading', profile: null, error: null });
       const data = await api.validateCredentials();
       setCredentialStatus({ status: 'valid', profile: data.profile, error: null });
@@ -207,9 +210,13 @@ function App() {
                 value={environment}
                 onChange={(e) => switchEnvironment(e.target.value)}
               >
-                {config.environments.map((env) => (
-                  <option key={env} value={env}>{env.toUpperCase()}</option>
-                ))}
+                {config.environments
+                  .filter((env) => env.awsProfile === config.awsProfile)
+                  .map((env) => (
+                    <option key={env.name} value={env.name}>
+                      {env.name.toUpperCase()}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>

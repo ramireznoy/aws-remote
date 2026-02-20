@@ -144,18 +144,19 @@ var terminalCommands = [
           { type: 'info', text: 'Available environments:' },
         ];
         ctx.environments.forEach(function (e) {
-          var marker = e === ctx.environment ? ' ←' : '';
-          lines.push({ type: 'command', text: '  ' + e + marker });
+          var name = e.name || e;
+          var marker = name === ctx.environment ? ' ←' : '';
+          lines.push({ type: 'command', text: '  ' + name + marker });
         });
         lines.push({ type: 'muted', text: '' });
         lines.push({ type: 'muted', text: 'Usage: venv <env>' });
         ctx.appendOutput(lines);
         return;
       }
-      if (!ctx.environments.includes(target)) {
+      if (!ctx.environments.some(function (e) { return (e.name || e) === target; })) {
         ctx.appendOutput([
           { type: 'error', text: 'venv: unknown environment: ' + target },
-          { type: 'muted', text: 'Available: ' + ctx.environments.join(', ') },
+          { type: 'muted', text: 'Available: ' + ctx.environments.map(function (e) { return e.name || e; }).join(', ') },
         ]);
         return;
       }

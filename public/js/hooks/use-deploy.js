@@ -25,6 +25,7 @@ function useDeploy(environment, config, addToast) {
   const [monitoring, setMonitoring] = React.useState(false);
   const prevStatusesRef = React.useRef({});
   const subscribedPipelinesRef = React.useRef([]);
+  const subscribedEnvironmentRef = React.useRef(null);
 
   // Initialize WebSocket connection on mount
   React.useEffect(() => {
@@ -41,7 +42,7 @@ function useDeploy(environment, config, addToast) {
     const handleReconnect = () => {
       console.log('WebSocket reconnected, re-subscribing to pipelines...');
       if (subscribedPipelinesRef.current.length) {
-        WebSocketClient.subscribePipelines(subscribedPipelinesRef.current);
+        WebSocketClient.subscribePipelines(subscribedPipelinesRef.current, subscribedEnvironmentRef.current);
       }
     };
     const unsubscribeReconnect = WebSocketClient.on('connect', handleReconnect);
@@ -85,9 +86,10 @@ function useDeploy(environment, config, addToast) {
   }, [selectedRepos]);
 
   // Auto-subscribe to WebSocket updates for selected pipelines
-  var selectedPipelineNames = (config && config.repos)
+  var envObj = config ? getEnvObject(config, environment) : null;
+  var selectedPipelineNames = (config && config.repos && envObj)
     ? config.repos.filter(function (r) { return selectedRepos[r.name]; })
-        .map(function (r) { return r.pipelineName.replace('{env}', environment); })
+        .map(function (r) { return resolveName(envObj.pipelinePattern, environment, r.name); })
     : [];
   var selectedPipelinesKey = selectedPipelineNames.join(',');
 
@@ -98,21 +100,22 @@ function useDeploy(environment, config, addToast) {
       subscribedPipelinesRef.current = [];
     }
 
-    if (!selectedPipelineNames.length) {
+    if (!selectedPipelineNames.length || !envObj) {
       setPipelineStatuses([]);
       setMonitoring(false);
       return;
     }
 
     // Subscribe to new pipelines (server will send initial status immediately)
-    WebSocketClient.subscribePipelines(selectedPipelineNames);
+    WebSocketClient.subscribePipelines(selectedPipelineNames, environment);
     subscribedPipelinesRef.current = selectedPipelineNames;
+    subscribedEnvironmentRef.current = environment;
     setMonitoring(true);
 
     // Keep fallback HTTP polling for initial load (in case WebSocket isn't connected yet)
     let cancelled = false;
     const timer = setTimeout(() => {
-      api.getStatus(selectedPipelineNames)
+      api.getStatus(selectedPipelineNames, environment)
         .then(statuses => { if (!cancelled) setPipelineStatuses(statuses); })
         .catch(() => {});
     }, 300);
@@ -219,12 +222,11 @@ function useDeploy(environment, config, addToast) {
       .filter((r) => selectedRepos[r.name])
       .map((r) => ({
         name: r.name,
-        pipelineName: r.pipelineName,
         branch: getBranch(r.name),
       }))
       .filter((r) => {
         // Skip pipelines that are already InProgress
-        const pipeline = r.pipelineName.replace('{env}', environment);
+        const pipeline = envObj ? resolveName(envObj.pipelinePattern, environment, r.name) : '';
         const status = statusMap[pipeline];
         if (status && status.overall === 'InProgress') {
           addToast(`${r.name} is already running, skipping`, 'info');
@@ -279,12 +281,12 @@ function useDeploy(environment, config, addToast) {
         });
       });
 
-      await api.trigger(pipelineName);
+      await api.trigger(pipelineName, environment);
       addToast('Pipeline triggered: ' + pipelineName, 'success');
 
       // Force immediate status refresh for this pipeline
       setTimeout(() => {
-        api.getStatus([pipelineName])
+        api.getStatus([pipelineName], environment)
           .then(statuses => handleStatusUpdate(statuses))
           .catch(() => {});
       }, 2000);
@@ -293,7 +295,7 @@ function useDeploy(environment, config, addToast) {
       // Revert optimistic update on error
       const currentStatuses = pipelineStatuses.filter(s => s.pipeline !== pipelineName);
       if (currentStatuses.length < pipelineStatuses.length) {
-        api.getStatus([pipelineName])
+        api.getStatus([pipelineName], environment)
           .then(statuses => handleStatusUpdate(statuses))
           .catch(() => {});
       }
@@ -321,19 +323,19 @@ function useDeploy(environment, config, addToast) {
       });
 
       const executionId = status.executions[0].id;
-      await api.stopPipeline(pipelineName, executionId);
+      await api.stopPipeline(pipelineName, executionId, environment);
       addToast('Pipeline stopped: ' + pipelineName, 'success');
 
       // Force immediate status refresh
       setTimeout(() => {
-        api.getStatus([pipelineName])
+        api.getStatus([pipelineName], environment)
           .then(statuses => handleStatusUpdate(statuses))
           .catch(() => {});
       }, 2000);
     } catch (err) {
       addToast('Stop failed: ' + err.message, 'error');
       // Revert optimistic update on error
-      api.getStatus([pipelineName])
+      api.getStatus([pipelineName], environment)
         .then(statuses => handleStatusUpdate(statuses))
         .catch(() => {});
     }

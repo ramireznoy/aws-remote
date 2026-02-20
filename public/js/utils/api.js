@@ -21,10 +21,13 @@ var api = (function () {
     getDeveloper: () => request('GET', '/api/developer'),
     deploy: (payload) => request('POST', '/api/deploy', payload),
     getNotifyMessage: (payload) => request('POST', '/api/notify-message', payload),
-    trigger: (pipelineName) => request('POST', '/api/trigger', { pipelineName }),
-    stopPipeline: (pipelineName, executionId) => request('POST', '/api/stop', { pipelineName, executionId }),
-    getStatus: (pipelineNames) =>
-      request('GET', '/api/status?pipelines=' + pipelineNames.map(encodeURIComponent).join(',')),
+    trigger: (pipelineName, environment) => request('POST', '/api/trigger', { pipelineName, environment }),
+    stopPipeline: (pipelineName, executionId, environment) => request('POST', '/api/stop', { pipelineName, executionId, environment }),
+    getStatus: (pipelineNames, environment) => {
+      let url = '/api/status?pipelines=' + pipelineNames.map(encodeURIComponent).join(',');
+      if (environment) url += '&env=' + encodeURIComponent(environment);
+      return request('GET', url);
+    },
     runCommand: (payload) => request('POST', '/api/run-command', payload),
   };
 })();

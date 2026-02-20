@@ -1,13 +1,55 @@
 {
   "environments": [
-    "uat1",
-    "uat2",
-    "uat3",
-    "uat4",
-    "uat5",
-    "nfip"
+    {
+      "name": "uat1",
+      "awsProfile": "uat",
+      "awsRegion": "us-east-1",
+      "pipelinePattern": "{env}-{repo}-CodePipeline",
+      "lambdaName": "{env}-run-command",
+      "taskPattern": "{env}-{repo}"
+    },
+    {
+      "name": "uat2",
+      "awsProfile": "uat",
+      "awsRegion": "us-east-1",
+      "pipelinePattern": "{env}-{repo}-CodePipeline",
+      "lambdaName": "{env}-run-command",
+      "taskPattern": "{env}-{repo}"
+    },
+    {
+      "name": "uat3",
+      "awsProfile": "uat",
+      "awsRegion": "us-east-1",
+      "pipelinePattern": "{env}-{repo}-CodePipeline",
+      "lambdaName": "{env}-run-command",
+      "taskPattern": "{env}-{repo}"
+    },
+    {
+      "name": "uat4",
+      "awsProfile": "uat",
+      "awsRegion": "us-east-1",
+      "pipelinePattern": "{env}-{repo}-CodePipeline",
+      "lambdaName": "{env}-run-command",
+      "taskPattern": "{env}-{repo}"
+    },
+    {
+      "name": "uat5",
+      "awsProfile": "uat",
+      "awsRegion": "us-east-1",
+      "pipelinePattern": "{env}-{repo}-CodePipeline",
+      "lambdaName": "{env}-run-command",
+      "taskPattern": "{env}-{repo}"
+    },
+    {
+      "name": "nfip",
+      "awsProfile": "nfip-uat",
+      "awsRegion": "us-gov-east-1",
+      "pipelinePattern": "{repo}-CodePipeline",
+      "lambdaName": "run-command",
+      "taskPattern": "{repo}"
+    }
   ],
-  "commandTemplates": [
+  "commandAliases": [
     {
       "name": "migrate:run",
       "command": "php artisan migrate:run",
@@ -37,67 +79,54 @@
   "repos": [
     {
       "name": "gfs-saas-accounting",
-      "pipelineName": "{env}-gfs-saas-accounting-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-agent-portal",
-      "pipelineName": "{env}-gfs-saas-agent-portal-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-agent-portal-front",
-      "pipelineName": "{env}-gfs-saas-agent-portal-front-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-auth",
-      "pipelineName": "{env}-gfs-saas-auth-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-claim",
-      "pipelineName": "{env}-gfs-saas-claim-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-client",
-      "pipelineName": "{env}-gfs-saas-client-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-core",
-      "pipelineName": "{env}-gfs-saas-core-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-front",
-      "pipelineName": "{env}-gfs-saas-front-CodePipeline",
       "scripts": []
     },
     {
       "name": "taurus-reports-service",
-      "pipelineName": "{env}-taurus-reports-service-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-instantquote",
-      "pipelineName": "{env}-gfs-saas-instantquote-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-instantquote-front",
-      "pipelineName": "{env}-gfs-saas-instantquote-front-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-policy",
-      "pipelineName": "{env}-gfs-saas-policy-CodePipeline",
       "scripts": []
     },
     {
       "name": "gfs-saas-producer",
-      "pipelineName": "{env}-gfs-saas-producer-CodePipeline",
       "scripts": []
     }
   ],

@@ -20,3 +20,11 @@ var execColorMap = {
   Superseded: 'secondary',
   Stopping: 'warning',
 };
+
+function resolveName(pattern, envName, repoName) {
+  return (pattern || '').replace('{env}', envName).replace('{repo}', repoName || '');
+}
+
+function getEnvObject(config, envName) {
+  return (config.environments || []).find(function(e) { return e.name === envName; });
+}

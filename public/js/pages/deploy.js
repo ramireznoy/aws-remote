@@ -36,7 +36,6 @@ function Deploy({ environment, config, addToast }) {
     // Fetch notification message from server (single source of truth)
     const repos = activeRepos.map((r) => ({
       name: r.name,
-      pipelineName: r.pipelineName,
       branch: getBranch(r.name),
     }));
     try {
@@ -60,10 +59,11 @@ function Deploy({ environment, config, addToast }) {
     : availableRepos;
 
   // Build pipeline list from selected repos
-  const activePipelines = config ? config.repos
+  const envObj = config ? getEnvObject(config, environment) : null;
+  const activePipelines = (config && envObj) ? config.repos
     .filter((r) => selectedRepos[r.name])
     .map((r) => {
-      const pipeline = r.pipelineName.replace('{env}', environment);
+      const pipeline = resolveName(envObj.pipelinePattern, environment, r.name);
       const result = deployResults.find((dr) => dr.pipeline === pipeline);
       const status = statusMap[pipeline];
       const branch = getBranch(r.name);

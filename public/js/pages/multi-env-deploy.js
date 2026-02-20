@@ -32,13 +32,18 @@ function MultiEnvDeploy({ config, addToast }) {
   const [pipelineStatuses, setPipelineStatuses] = React.useState([]);
   const [monitoring, setMonitoring] = React.useState(false);
   const prevStatusesRef = React.useRef({});
-  const subscribedPipelinesRef = React.useRef([]);
+  // Array of { env, pipelines } for reconnect re-subscription
+  const subscribedGroupsRef = React.useRef([]);
+
+  // Environments available for the active profile
+  const availableEnvs = config
+    ? config.environments.filter((e) => e.awsProfile === config.awsProfile)
+    : [];
 
   // Initialize WebSocket connection on mount
   React.useEffect(() => {
     WebSocketClient.connect();
 
-    // Listen for pipeline status events
     const unsubscribe = WebSocketClient.on('pipeline:status', (event) => {
       if (event.data && event.data.statuses) {
         handleStatusUpdate(event.data.statuses);
@@ -48,92 +53,87 @@ function MultiEnvDeploy({ config, addToast }) {
     // Re-subscribe when WebSocket reconnects
     const handleReconnect = () => {
       console.log('WebSocket reconnected, re-subscribing to pipelines...');
-      if (subscribedPipelinesRef.current.length) {
-        WebSocketClient.subscribePipelines(subscribedPipelinesRef.current);
-      }
+      subscribedGroupsRef.current.forEach(({ env, pipelines }) => {
+        WebSocketClient.subscribePipelines(pipelines, env);
+      });
     };
     const unsubscribeReconnect = WebSocketClient.on('connect', handleReconnect);
 
     return () => {
       unsubscribe();
       unsubscribeReconnect();
-      // Unsubscribe from all pipelines on unmount
-      if (subscribedPipelinesRef.current.length) {
-        WebSocketClient.unsubscribePipelines(subscribedPipelinesRef.current);
-      }
+      subscribedGroupsRef.current.forEach(({ pipelines }) => {
+        WebSocketClient.unsubscribePipelines(pipelines);
+      });
     };
   }, []);
 
   // Persist to localStorage
   React.useEffect(() => {
-    try {
-      localStorage.setItem('rc-multienv-branch', defaultBranch);
-    } catch {}
+    try { localStorage.setItem('rc-multienv-branch', defaultBranch); } catch {}
   }, [defaultBranch]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem('rc-multienv-overrides', JSON.stringify(branchOverrides));
-    } catch {}
+    try { localStorage.setItem('rc-multienv-overrides', JSON.stringify(branchOverrides)); } catch {}
   }, [branchOverrides]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem('rc-multienv-repos', JSON.stringify(selectedRepos));
-    } catch {}
+    try { localStorage.setItem('rc-multienv-repos', JSON.stringify(selectedRepos)); } catch {}
   }, [selectedRepos]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem('rc-multienv-envs', JSON.stringify(selectedEnvs));
-    } catch {}
+    try { localStorage.setItem('rc-multienv-envs', JSON.stringify(selectedEnvs)); } catch {}
   }, [selectedEnvs]);
 
-  // Auto-subscribe to WebSocket updates for selected pipelines
+  // Auto-subscribe to WebSocket updates for selected pipelines (grouped per environment)
   React.useEffect(() => {
-    // Unsubscribe from previous pipelines first
-    if (subscribedPipelinesRef.current.length) {
-      WebSocketClient.unsubscribePipelines(subscribedPipelinesRef.current);
-      subscribedPipelinesRef.current = [];
-    }
+    // Unsubscribe previous groups
+    subscribedGroupsRef.current.forEach(({ pipelines }) => {
+      WebSocketClient.unsubscribePipelines(pipelines);
+    });
+    subscribedGroupsRef.current = [];
 
     const repos = config ? config.repos.filter((r) => selectedRepos[r.name]) : [];
-    const envs = Object.keys(selectedEnvs).filter((e) => selectedEnvs[e]);
+    const activeEnvNames = availableEnvs.map((e) => e.name).filter((n) => selectedEnvs[n]);
 
-    const pipelineNames = [];
-    envs.forEach((env) => {
-      repos.forEach((repo) => {
-        pipelineNames.push(repo.pipelineName.replace('{env}', env));
-      });
-    });
-
-    if (!pipelineNames.length) {
+    if (!repos.length || !activeEnvNames.length) {
       setPipelineStatuses([]);
       setMonitoring(false);
       return;
     }
 
-    // Subscribe to new pipelines (server will send initial status immediately)
-    WebSocketClient.subscribePipelines(pipelineNames);
-    subscribedPipelinesRef.current = pipelineNames;
+    // Build groups: one subscribe call per environment
+    const groups = activeEnvNames.map((envName) => {
+      const envObj = getEnvObject(config, envName);
+      const pipelines = repos.map((r) => resolveName(envObj.pipelinePattern, envName, r.name));
+      return { env: envName, pipelines };
+    });
+
+    groups.forEach(({ env, pipelines }) => {
+      WebSocketClient.subscribePipelines(pipelines, env);
+    });
+    subscribedGroupsRef.current = groups;
     setMonitoring(true);
 
-    // Keep fallback HTTP polling for initial load (in case WebSocket isn't connected yet)
+    // HTTP fallback per environment
     let cancelled = false;
     const timer = setTimeout(() => {
-      api.getStatus(pipelineNames)
-        .then(statuses => { if (!cancelled) setPipelineStatuses(statuses); })
-        .catch(() => {});
+      Promise.all(
+        groups.map(({ env, pipelines }) =>
+          api.getStatus(pipelines, env).catch(() => [])
+        )
+      ).then((allStatuses) => {
+        if (!cancelled) setPipelineStatuses(allStatuses.flat());
+      });
     }, 300);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      // Unsubscribe on cleanup
-      if (subscribedPipelinesRef.current.length) {
-        WebSocketClient.unsubscribePipelines(subscribedPipelinesRef.current);
-        subscribedPipelinesRef.current = [];
-      }
+      subscribedGroupsRef.current.forEach(({ pipelines }) => {
+        WebSocketClient.unsubscribePipelines(pipelines);
+      });
+      subscribedGroupsRef.current = [];
     };
   }, [JSON.stringify(selectedRepos), JSON.stringify(selectedEnvs), config]);
 
@@ -141,11 +141,18 @@ function MultiEnvDeploy({ config, addToast }) {
     return branchOverrides[repoName] || defaultBranch;
   }
 
+  // Build a pipelineName → envName lookup from current subscriptions
+  function getPipelineEnv(pipelineName) {
+    for (const { env, pipelines } of subscribedGroupsRef.current) {
+      if (pipelines.includes(pipelineName)) return env;
+    }
+    return null;
+  }
+
   // Handle incoming WebSocket status updates
   function handleStatusUpdate(statuses) {
     let allStatuses = [];
     setPipelineStatuses((prev) => {
-      // Merge new statuses with existing ones
       const statusMap = {};
       prev.forEach((s) => { statusMap[s.pipeline] = s; });
       statuses.forEach((s) => { statusMap[s.pipeline] = s; });
@@ -158,7 +165,6 @@ function MultiEnvDeploy({ config, addToast }) {
       statuses.forEach((current) => {
         const prev = prevStatusesRef.current[current.pipeline];
         if (prev && prev !== current.overall) {
-          // Notify on transition to terminal states
           if (current.overall === 'Succeeded') {
             new Notification('Pipeline Succeeded ✓', {
               body: `${current.pipeline} completed successfully`,
@@ -175,7 +181,6 @@ function MultiEnvDeploy({ config, addToast }) {
       });
     }
 
-    // Check if ALL monitored pipelines (not just incoming) are in terminal state
     if (allStatuses.length > 0 && monitoring) {
       const allDone = allStatuses.every(
         (s) => s.overall === 'Succeeded' || s.overall === 'Failed' || s.overall === 'Stopped' || s.overall === 'Canceled' || s.overall === 'Error' || s.overall === 'Idle'
@@ -201,11 +206,11 @@ function MultiEnvDeploy({ config, addToast }) {
     });
   }
 
-  function toggleEnv(env) {
+  function toggleEnv(envName) {
     setSelectedEnvs((prev) => {
       const next = { ...prev };
-      if (next[env]) delete next[env];
-      else next[env] = true;
+      if (next[envName]) delete next[envName];
+      else next[envName] = true;
       return next;
     });
   }
@@ -234,15 +239,14 @@ function MultiEnvDeploy({ config, addToast }) {
       return;
     }
 
-    // Check all repos have a branch
     const noBranch = activeRepos.find((r) => !getBranch(r.name).trim());
     if (noBranch) {
       addToast(`No branch set for ${noBranch.name}`, 'error');
       return;
     }
 
-    const activeEnvs = Object.keys(selectedEnvs).filter((e) => selectedEnvs[e]);
-    if (!activeEnvs.length) {
+    const activeEnvNames = availableEnvs.map((e) => e.name).filter((n) => selectedEnvs[n]);
+    if (!activeEnvNames.length) {
       addToast('Please select at least one environment', 'error');
       return;
     }
@@ -250,11 +254,10 @@ function MultiEnvDeploy({ config, addToast }) {
     setDeploying(true);
     setResults([]);
 
-    // Deploy to all environments in parallel
-    const deployPromises = activeEnvs.map(async (environment) => {
+    const deployPromises = activeEnvNames.map(async (environment) => {
+      const envObj = getEnvObject(config, environment);
       const repos = activeRepos.map((r) => ({
         name: r.name,
-        pipelineName: r.pipelineName,
         branch: getBranch(r.name).trim(),
       }));
 
@@ -266,7 +269,7 @@ function MultiEnvDeploy({ config, addToast }) {
           environment,
           results: repos.map((r) => ({
             repo: r.name,
-            pipeline: r.pipelineName.replace('{env}', environment),
+            pipeline: resolveName(envObj.pipelinePattern, environment, r.name),
             status: 'error',
             error: err.message,
           })),
@@ -278,47 +281,38 @@ function MultiEnvDeploy({ config, addToast }) {
     setResults(allResults);
     setDeploying(false);
 
-    // Summary toast
     const totalTriggered = allResults.reduce((sum, r) => sum + r.results.filter((x) => x.status === 'triggered').length, 0);
     const totalErrors = allResults.reduce((sum, r) => sum + r.results.filter((x) => x.status === 'error').length, 0);
 
     if (totalTriggered) addToast(`${totalTriggered} pipeline(s) triggered across ${allResults.length} environment(s)`, 'success');
     if (totalErrors) addToast(`${totalErrors} pipeline(s) failed`, 'error');
-
-    // WebSocket subscriptions are already active via selectedPipelines effect
   }
 
   async function triggerPipeline(pipelineName) {
+    const environment = getPipelineEnv(pipelineName);
     try {
-      // Optimistically update the status to InProgress
-      setPipelineStatuses((prev) => {
-        return prev.map((s) => {
-          if (s.pipeline === pipelineName) {
-            return { ...s, overall: 'InProgress' };
-          }
-          return s;
-        });
-      });
+      setPipelineStatuses((prev) =>
+        prev.map((s) => s.pipeline === pipelineName ? { ...s, overall: 'InProgress' } : s)
+      );
 
-      await api.trigger(pipelineName);
+      await api.trigger(pipelineName, environment);
       addToast('Pipeline triggered: ' + pipelineName, 'success');
 
-      // Force immediate status refresh for this pipeline
       setTimeout(() => {
-        api.getStatus([pipelineName])
+        api.getStatus([pipelineName], environment)
           .then(statuses => handleStatusUpdate(statuses))
           .catch(() => {});
       }, 2000);
     } catch (err) {
       addToast('Trigger failed: ' + err.message, 'error');
-      // Revert optimistic update on error
-      api.getStatus([pipelineName])
+      api.getStatus([pipelineName], environment)
         .then(statuses => handleStatusUpdate(statuses))
         .catch(() => {});
     }
   }
 
   async function stopPipeline(pipelineName) {
+    const environment = getPipelineEnv(pipelineName);
     try {
       const status = pipelineStatuses.find((s) => s.pipeline === pipelineName);
       if (!status || !status.executions || !status.executions.length) {
@@ -326,30 +320,22 @@ function MultiEnvDeploy({ config, addToast }) {
         return;
       }
 
-      // Optimistically update the status to Stopped
-      setPipelineStatuses((prev) => {
-        return prev.map((s) => {
-          if (s.pipeline === pipelineName) {
-            return { ...s, overall: 'Stopped' };
-          }
-          return s;
-        });
-      });
+      setPipelineStatuses((prev) =>
+        prev.map((s) => s.pipeline === pipelineName ? { ...s, overall: 'Stopped' } : s)
+      );
 
       const executionId = status.executions[0].id;
-      await api.stopPipeline(pipelineName, executionId);
+      await api.stopPipeline(pipelineName, executionId, environment);
       addToast('Pipeline stopped: ' + pipelineName, 'success');
 
-      // Force immediate status refresh
       setTimeout(() => {
-        api.getStatus([pipelineName])
+        api.getStatus([pipelineName], environment)
           .then(statuses => handleStatusUpdate(statuses))
           .catch(() => {});
       }, 2000);
     } catch (err) {
       addToast('Stop failed: ' + err.message, 'error');
-      // Revert optimistic update on error
-      api.getStatus([pipelineName])
+      api.getStatus([pipelineName], environment)
         .then(statuses => handleStatusUpdate(statuses))
         .catch(() => {});
     }
@@ -361,7 +347,7 @@ function MultiEnvDeploy({ config, addToast }) {
     ? availableRepos.filter((r) => r.name.toLowerCase().includes(addSearch.toLowerCase()))
     : availableRepos;
 
-  const activeEnvs = Object.keys(selectedEnvs).filter((e) => selectedEnvs[e]);
+  const activeEnvNames = availableEnvs.map((e) => e.name).filter((n) => selectedEnvs[n]);
 
   return (
     <div className="container-xl py-4">
@@ -409,36 +395,40 @@ function MultiEnvDeploy({ config, addToast }) {
                 emptyMessage="Add repositories above"
               />
 
-              {/* Environments */}
+              {/* Environments — only those matching the active AWS profile */}
               <div className="mb-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <label className="form-label mb-0">Environments</label>
-                  {activeEnvs.length > 0 && (
-                    <span className="badge bg-info-lt">{activeEnvs.length} selected</span>
+                  {activeEnvNames.length > 0 && (
+                    <span className="badge bg-info-lt">{activeEnvNames.length} selected</span>
                   )}
                 </div>
-                <div className="row g-2">
-                  {config && config.environments.map((env) => (
-                    <div key={env} className="col-6">
-                      <label className="form-check form-check-single">
-                        <input
-                          type="checkbox"
-                          className="form-check-input mx-2"
-                          checked={!!selectedEnvs[env]}
-                          onChange={() => toggleEnv(env)}
-                        />
-                        <span className="form-check-label">{env.toUpperCase()}</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                {availableEnvs.length === 0 ? (
+                  <div className="text-muted small">No environments available for the active AWS profile.</div>
+                ) : (
+                  <div className="row g-2">
+                    {availableEnvs.map((env) => (
+                      <div key={env.name} className="col-6">
+                        <label className="form-check form-check-single">
+                          <input
+                            type="checkbox"
+                            className="form-check-input mx-2"
+                            checked={!!selectedEnvs[env.name]}
+                            onChange={() => toggleEnv(env.name)}
+                          />
+                          <span className="form-check-label">{env.name.toUpperCase()}</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Deploy Button */}
               <button
                 className="btn btn-primary w-100"
                 onClick={handleDeploy}
-                disabled={deploying || !defaultBranch.trim() || activeRepos.length === 0 || activeEnvs.length === 0}
+                disabled={deploying || !defaultBranch.trim() || activeRepos.length === 0 || activeEnvNames.length === 0}
               >
                 {deploying ? (
                   <React.Fragment>
@@ -448,7 +438,7 @@ function MultiEnvDeploy({ config, addToast }) {
                 ) : (
                   <React.Fragment>
                     <i className="ti ti-rocket me-1" />
-                    Deploy to {activeEnvs.length || 0} env(s)
+                    Deploy to {activeEnvNames.length || 0} env(s)
                   </React.Fragment>
                 )}
               </button>
@@ -472,7 +462,7 @@ function MultiEnvDeploy({ config, addToast }) {
               )}
             </div>
             <div className="card-body scrollable-panel">
-              {activeRepos.length === 0 || activeEnvs.length === 0 ? (
+              {activeRepos.length === 0 || activeEnvNames.length === 0 ? (
                 <EmptyState
                   icon="list-search"
                   title="No pipelines selected"
@@ -480,17 +470,18 @@ function MultiEnvDeploy({ config, addToast }) {
                 />
               ) : (
                 <div className="d-flex flex-column gap-3">
-                  {activeEnvs.map((environment) => {
+                  {activeEnvNames.map((envName) => {
+                    const envObj = getEnvObject(config, envName);
                     const envPipelines = activeRepos.map((repo) => {
-                      const pipelineName = repo.pipelineName.replace('{env}', environment);
+                      const pipelineName = resolveName(envObj.pipelinePattern, envName, repo.name);
                       const status = pipelineStatuses.find((s) => s.pipeline === pipelineName);
                       const branch = getBranch(repo.name);
                       return { repo: repo.name, pipeline: pipelineName, status, branch, loading: monitoring && !status };
                     });
 
                     return (
-                      <div key={environment}>
-                        <h4 className="mb-2">{environment.toUpperCase()}</h4>
+                      <div key={envName}>
+                        <h4 className="mb-2">{envName.toUpperCase()}</h4>
                         <div className="d-flex flex-column gap-2">
                           {envPipelines.map(({ repo, pipeline, status, branch, loading }) => (
                             <PipelineCard

@@ -4,11 +4,14 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
   const [editConfig, setEditConfig] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [expandedRepos, setExpandedRepos] = React.useState({});
+  const [expandedEnvs, setExpandedEnvs] = React.useState({});
   const [confirmDelete, setConfirmDelete] = React.useState(null); // { message, onConfirm }
 
   // New repo form
   const [newRepoName, setNewRepoName] = React.useState('');
-  const [newRepoPattern, setNewRepoPattern] = React.useState('');
+
+  // New environment form
+  const [newEnvName, setNewEnvName] = React.useState('');
 
   React.useEffect(() => {
     if (config) {
@@ -18,7 +21,7 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
 
   if (!editConfig) return null;
 
-  const commandTemplates = editConfig.commandTemplates || [];
+  const commandAliases = editConfig.commandAliases || [];
 
   // --- Save ---
   async function handleSave() {
@@ -30,16 +33,65 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
     }
   }
 
-  // --- Repo CRUD ---
-  function addRepo() {
-    if (!newRepoName.trim() || !newRepoPattern.trim()) return;
+  // --- Environment CRUD ---
+  function addEnvironment() {
+    if (!newEnvName.trim()) return;
     const updated = {
       ...editConfig,
-      repos: [...editConfig.repos, { name: newRepoName.trim(), pipelineName: newRepoPattern.trim(), scripts: [] }],
+      environments: [...editConfig.environments, {
+        name: newEnvName.trim(),
+        awsProfile: editConfig.awsProfile,
+        awsRegion: editConfig.awsRegion,
+        pipelinePattern: '{env}-{repo}-CodePipeline',
+        lambdaName: '{env}-run-command',
+        taskPattern: '{env}-{repo}',
+      }],
+    };
+    setEditConfig(updated);
+    setNewEnvName('');
+    onSave(updated);
+  }
+
+  function confirmRemoveEnv(index) {
+    const env = editConfig.environments[index];
+    setConfirmDelete({
+      message: `Remove environment "${env.name}"?`,
+      onConfirm: () => {
+        const updated = {
+          ...editConfig,
+          environments: editConfig.environments.filter((_, i) => i !== index),
+        };
+        setEditConfig(updated);
+        onSave(updated);
+        setConfirmDelete(null);
+      },
+    });
+  }
+
+  function updateEnvField(index, field, value) {
+    setEditConfig((prev) => ({
+      ...prev,
+      environments: prev.environments.map((e, i) => i === index ? { ...e, [field]: value } : e),
+    }));
+  }
+
+  function saveEnvField(updated) {
+    onSave(updated || editConfig);
+  }
+
+  function toggleEnv(index) {
+    setExpandedEnvs((prev) => ({ ...prev, [index]: !prev[index] }));
+  }
+
+  // --- Repo CRUD ---
+  function addRepo() {
+    if (!newRepoName.trim()) return;
+    const updated = {
+      ...editConfig,
+      repos: [...editConfig.repos, { name: newRepoName.trim(), scripts: [] }],
     };
     setEditConfig(updated);
     setNewRepoName('');
-    setNewRepoPattern('');
     onSave(updated);
   }
 
@@ -114,24 +166,24 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
     onSave(updated);
   }
 
-  // --- Global templates ---
-  function addGlobalTemplate(script) {
+  // --- Global command aliases ---
+  function addGlobalAlias(script) {
     const updated = {
       ...editConfig,
-      commandTemplates: [...commandTemplates, script],
+      commandAliases: [...commandAliases, script],
     };
     setEditConfig(updated);
     onSave(updated);
   }
 
-  function confirmRemoveGlobalTemplate(index) {
-    const tmpl = commandTemplates[index];
+  function confirmRemoveGlobalAlias(index) {
+    const alias = commandAliases[index];
     setConfirmDelete({
-      message: `Remove global command "${tmpl.name}"?`,
+      message: `Remove global command "${alias.name}"?`,
       onConfirm: () => {
         const updated = {
           ...editConfig,
-          commandTemplates: commandTemplates.filter((_, i) => i !== index),
+          commandAliases: commandAliases.filter((_, i) => i !== index),
         };
         setEditConfig(updated);
         onSave(updated);
@@ -140,10 +192,10 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
     });
   }
 
-  function updateGlobalTemplate(index, updatedScript) {
+  function updateGlobalAlias(index, updatedScript) {
     const updated = {
       ...editConfig,
-      commandTemplates: commandTemplates.map((t, i) => i === index ? updatedScript : t),
+      commandAliases: commandAliases.map((t, i) => i === index ? updatedScript : t),
     };
     setEditConfig(updated);
     onSave(updated);
@@ -154,7 +206,7 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
     setExpandedRepos((prev) => ({ ...prev, [index]: !prev[index] }));
   }
 
-  // --- ScriptTable: reusable for global templates and per-repo scripts ---
+  // --- ScriptTable: reusable for global aliases and per-repo scripts ---
   function ScriptTable({ scripts, onAdd, onRemove, onEdit }) {
     const [editingIndex, setEditingIndex] = React.useState(null);
     const [editValues, setEditValues] = React.useState({});
@@ -324,7 +376,7 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
               <i className="ti ti-settings me-2" />
               Settings
             </h2>
-            <div className="text-muted mt-1">Configure your pipelines, AWS connection, and notifications.</div>
+            <div className="text-muted mt-1">Configure your environments, repos, AWS connection, and notifications.</div>
           </div>
           <div className="col-auto">
             <button
@@ -361,7 +413,7 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
             </div>
             <div className="card-body">
               <div className="mb-3">
-                <label className="form-label">AWS Profile</label>
+                <label className="form-label">Active AWS Profile</label>
                 <select
                   className={`form-select ${credentialStatus?.status === 'invalid' ? 'is-invalid' : ''}`}
                   value={editConfig.awsProfile}
@@ -379,9 +431,12 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
                     {credentialStatus.error}
                   </div>
                 )}
+                <div className="form-hint mt-1">
+                  Determines which environments are available. Only environments with a matching profile will be active.
+                </div>
               </div>
               <div className="mb-3">
-                <label className="form-label">AWS Region</label>
+                <label className="form-label">Default AWS Region</label>
                 <input
                   type="text"
                   className="form-control"
@@ -428,28 +483,159 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
           </div>
         </div>
 
-        {/* Right column — Global Templates + Repos */}
+        {/* Right column — Environments, Global Aliases, Repos */}
         <div className="col-md-7">
-          {/* Global Command Templates */}
+          {/* Environments */}
+          <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h3 className="card-title">
+                <i className="ti ti-server me-2" />
+                Environments
+              </h3>
+              <span className="badge bg-secondary-lt">{editConfig.environments.length} environments</span>
+            </div>
+            <div className="card-body p-0">
+              {editConfig.environments.map((env, i) => {
+                const isExpanded = expandedEnvs[i];
+                const isActive = env.awsProfile === editConfig.awsProfile;
+
+                return (
+                  <div key={i} className="border-bottom">
+                    <div
+                      className="d-flex align-items-center px-3 py-2"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => toggleEnv(i)}
+                    >
+                      <i className={`ti ti-chevron-${isExpanded ? 'down' : 'right'} me-2 text-muted`} />
+                      <span className="fw-bold flex-grow-1">{env.name}</span>
+                      <span className={`badge me-2 ${isActive ? 'bg-success-lt' : 'bg-secondary-lt'}`}>
+                        {env.awsProfile}
+                      </span>
+                      <button
+                        className="btn btn-ghost-danger btn-sm btn-icon"
+                        onClick={(e) => { e.stopPropagation(); confirmRemoveEnv(i); }}
+                        title="Remove environment"
+                      >
+                        <i className="ti ti-trash" />
+                      </button>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3" style={{ marginLeft: '1.5rem' }}>
+                        <div className="row g-2 mb-2">
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">Name</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.name}
+                              onChange={(e) => updateEnvField(i, 'name', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                          </div>
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">AWS Profile</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.awsProfile}
+                              onChange={(e) => updateEnvField(i, 'awsProfile', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                          </div>
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">AWS Region</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.awsRegion}
+                              onChange={(e) => updateEnvField(i, 'awsRegion', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                          </div>
+                        </div>
+                        <div className="row g-2">
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">Pipeline Pattern</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.pipelinePattern}
+                              onChange={(e) => updateEnvField(i, 'pipelinePattern', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                            <div className="form-hint mt-1">Use <code>{'{env}'}</code> and <code>{'{repo}'}</code></div>
+                          </div>
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">Lambda Name</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.lambdaName}
+                              onChange={(e) => updateEnvField(i, 'lambdaName', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                          </div>
+                          <div className="col-md-4">
+                            <label className="form-label mb-1">Task Pattern</label>
+                            <input
+                              type="text" className="form-control"
+                              value={env.taskPattern}
+                              onChange={(e) => updateEnvField(i, 'taskPattern', e.target.value)}
+                              onBlur={() => saveEnvField()}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add environment form */}
+              <div className="px-3 py-3 d-flex gap-2 align-items-end">
+                <div className="flex-grow-1">
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="env-name"
+                    value={newEnvName}
+                    onChange={(e) => setNewEnvName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addEnvironment()}
+                  />
+                </div>
+                <button
+                  className="btn btn-ghost-success btn-icon"
+                  onClick={addEnvironment}
+                  disabled={!newEnvName.trim()}
+                  title="Add environment"
+                >
+                  <i className="ti ti-plus" />
+                </button>
+              </div>
+            </div>
+            <div className="card-footer">
+              <div className="text-muted">
+                Use <code>{'{env}'}</code> and <code>{'{repo}'}</code> placeholders in patterns. New environments inherit the current default profile and region.
+              </div>
+            </div>
+          </div>
+
+          {/* Global Command Aliases */}
           <div className="card mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h3 className="card-title">
                 <i className="ti ti-terminal me-2" />
-                Global Command Templates
+                Global Command Aliases
               </h3>
-              <span className="badge bg-secondary-lt">{commandTemplates.length} commands</span>
+              <span className="badge bg-secondary-lt">{commandAliases.length} commands</span>
             </div>
             <div className="card-body p-0">
               <ScriptTable
-                scripts={commandTemplates}
-                onAdd={(s) => addGlobalTemplate(s)}
-                onRemove={(i) => confirmRemoveGlobalTemplate(i)}
-                onEdit={(i, s) => updateGlobalTemplate(i, s)}
+                scripts={commandAliases}
+                onAdd={(s) => addGlobalAlias(s)}
+                onRemove={(i) => confirmRemoveGlobalAlias(i)}
+                onEdit={(i, s) => updateGlobalAlias(i, s)}
               />
             </div>
             <div className="card-footer">
               <div className="text-muted">
-                Global commands are available in all services via the Terminal.
+                Global command aliases are available in all services via the Terminal.
               </div>
             </div>
           </div>
@@ -470,7 +656,6 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
 
                 return (
                   <div key={i} className="border-bottom">
-                    {/* Collapsed header */}
                     <div
                       className="d-flex align-items-center px-3 py-2"
                       style={{ cursor: 'pointer' }}
@@ -490,31 +675,17 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
                       </button>
                     </div>
 
-                    {/* Expanded body */}
                     {isExpanded && (
                       <div className="px-3 pb-3" style={{ marginLeft: '1.5rem' }}>
-                        <div className="mb-3 row g-2">
-                          <div className="col-md-4">
-                            <label className="form-label mb-1">Repo Name</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              value={repo.name}
-                              onChange={(e) => updateRepoField(i, 'name', e.target.value)}
-                              onBlur={saveRepoField}
-                            />
-                          </div>
-                          <div className="col-md-8">
-                            <label className="form-label mb-1">Pipeline Pattern</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              value={repo.pipelineName}
-                              onChange={(e) => updateRepoField(i, 'pipelineName', e.target.value)}
-                              onBlur={saveRepoField}
-                            />
-                            <div className="form-hint mt-1">Use <code>{'{env}'}</code> as placeholder for the environment name.</div>
-                          </div>
+                        <div className="mb-3">
+                          <label className="form-label mb-1">Repo Name</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={repo.name}
+                            onChange={(e) => updateRepoField(i, 'name', e.target.value)}
+                            onBlur={saveRepoField}
+                          />
                         </div>
 
                         <label className="form-label mb-1">Scripts</label>
@@ -544,20 +715,10 @@ function SettingsPage({ config, profiles, onSave, onSelectProfile, addToast, cre
                     onKeyDown={(e) => e.key === 'Enter' && addRepo()}
                   />
                 </div>
-                <div className="flex-grow-1">
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="{env}-repo-name-CodePipeline"
-                    value={newRepoPattern}
-                    onChange={(e) => setNewRepoPattern(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addRepo()}
-                  />
-                </div>
                 <button
                   className="btn btn-ghost-success btn-icon"
                   onClick={addRepo}
-                  disabled={!newRepoName.trim() || !newRepoPattern.trim()}
+                  disabled={!newRepoName.trim()}
                   title="Add repo"
                 >
                   <i className="ti ti-plus" />
