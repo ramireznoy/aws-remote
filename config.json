@@ -130,8 +130,8 @@
       "scripts": []
     }
   ],
-  "awsRegion": "us-east-1",
-  "awsProfile": "uat",
+  "awsRegion": "us-gov-east-1",
+  "awsProfile": "nfip-uat",
   "pollIntervalMs": 5000,
   "teamsWebhookUrl": ""
 }

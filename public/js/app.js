@@ -108,8 +108,28 @@ function App() {
     }
   }
 
-  function switchEnvironment(env) {
-    setEnvironment(env);
+  async function switchEnvironment(envName) {
+    setEnvironment(envName);
+    if (!config) return;
+    const envObj = getEnvObject(config, envName);
+    if (!envObj || envObj.awsProfile === config.awsProfile) return;
+
+    // Profile differs — update active profile and re-validate credentials
+    const profileData = profiles.find((p) => p.name === envObj.awsProfile);
+    const updated = {
+      ...config,
+      awsProfile: envObj.awsProfile,
+      ...(profileData?.region ? { awsRegion: profileData.region } : {}),
+    };
+    setConfig(updated);
+    try {
+      await api.saveConfig(updated);
+      setCredentialStatus({ status: 'loading', profile: null, error: null });
+      const data = await api.validateCredentials();
+      setCredentialStatus({ status: 'valid', profile: data.profile, error: null });
+    } catch (err) {
+      setCredentialStatus({ status: 'invalid', profile: envObj.awsProfile, error: err.message });
+    }
   }
 
   async function saveConfig(newConfig) {
@@ -210,9 +230,7 @@ function App() {
                 value={environment}
                 onChange={(e) => switchEnvironment(e.target.value)}
               >
-                {config.environments
-                  .filter((env) => env.awsProfile === config.awsProfile)
-                  .map((env) => (
+                {config.environments.map((env) => (
                     <option key={env.name} value={env.name}>
                       {env.name.toUpperCase()}
                     </option>
