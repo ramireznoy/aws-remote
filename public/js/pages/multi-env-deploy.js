@@ -485,14 +485,14 @@ function MultiEnvDeploy({ config, addToast }) {
                       const pipelineName = repo.pipelineName.replace('{env}', environment);
                       const status = pipelineStatuses.find((s) => s.pipeline === pipelineName);
                       const branch = getBranch(repo.name);
-                      return { repo: repo.name, pipeline: pipelineName, status, branch };
+                      return { repo: repo.name, pipeline: pipelineName, status, branch, loading: monitoring && !status };
                     });
 
                     return (
                       <div key={environment}>
                         <h4 className="mb-2">{environment.toUpperCase()}</h4>
                         <div className="d-flex flex-column gap-2">
-                          {envPipelines.map(({ repo, pipeline, status, branch }) => (
+                          {envPipelines.map(({ repo, pipeline, status, branch, loading }) => (
                             <PipelineCard
                               key={pipeline}
                               repo={repo}
@@ -500,6 +500,7 @@ function MultiEnvDeploy({ config, addToast }) {
                               result={{ repo, pipeline }}
                               status={status}
                               branch={branch}
+                              loading={loading}
                               onTrigger={() => triggerPipeline(pipeline)}
                               onStop={() => stopPipeline(pipeline)}
                             />

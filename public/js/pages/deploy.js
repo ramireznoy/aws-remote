@@ -67,7 +67,7 @@ function Deploy({ environment, config, addToast }) {
       const result = deployResults.find((dr) => dr.pipeline === pipeline);
       const status = statusMap[pipeline];
       const branch = getBranch(r.name);
-      return { repo: r.name, pipeline, result, status, branch };
+      return { repo: r.name, pipeline, result, status, branch, loading: monitoring && !status };
     }) : [];
 
   return (
@@ -172,7 +172,7 @@ function Deploy({ environment, config, addToast }) {
                 />
               ) : (
                 <div className="d-flex flex-column gap-2">
-                  {activePipelines.map(({ repo, pipeline, result, status, branch }) => (
+                  {activePipelines.map(({ repo, pipeline, result, status, branch, loading }) => (
                     <PipelineCard
                       key={pipeline}
                       repo={repo}
@@ -180,6 +180,7 @@ function Deploy({ environment, config, addToast }) {
                       result={result || { repo, pipeline, status: 'idle' }}
                       status={status}
                       branch={branch}
+                      loading={loading}
                       onTrigger={() => triggerPipeline(pipeline)}
                       onStop={() => stopPipeline(pipeline)}
                     />

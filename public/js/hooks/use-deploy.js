@@ -158,7 +158,6 @@ function useDeploy(environment, config, addToast) {
 
   // Handle incoming WebSocket status updates
   function handleStatusUpdate(statuses) {
-    console.log('handleStatusUpdate called with', statuses.length, 'statuses:', statuses);
     let allStatuses = [];
     setPipelineStatuses((prev) => {
       // Merge new statuses with existing ones

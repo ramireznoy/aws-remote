@@ -85,17 +85,25 @@ function StageIndicator({ stages }) {
   if (!stages || !stages.length) return <span className="text-muted">No stages</span>;
   return (
     <div className="stage-steps">
-      {stages.map((s, i) => (
-        <React.Fragment key={s.name}>
-          {i > 0 && <i className="ti ti-chevron-right stage-arrow" />}
-          <span className={`stage-step ${s.status}`}>
-            {s.status === 'Succeeded' && <i className="ti ti-check" />}
-            {s.status === 'Failed' && <i className="ti ti-x" />}
-            {s.status === 'InProgress' && <span className="spinner-border spinner-border-sm" />}
-            {s.name}
-          </span>
-        </React.Fragment>
-      ))}
+      {stages.map((s, i) => {
+        let tip;
+        if (s.status === 'Failed') {
+          const failedAction = s.actions?.find(a => a.status === 'Failed');
+          const msg = failedAction?.errorMessage;
+          tip = msg || undefined;
+        }
+        return (
+          <React.Fragment key={s.name}>
+            {i > 0 && <i className="ti ti-chevron-right stage-arrow" />}
+            <span className={`stage-step ${s.status}`} title={tip}>
+              {s.status === 'Succeeded' && <i className="ti ti-check" />}
+              {s.status === 'Failed' && <i className="ti ti-x" />}
+              {s.status === 'InProgress' && <span className="spinner-border spinner-border-sm" />}
+              {s.name}
+            </span>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -302,7 +310,28 @@ function RepositoryList({
   );
 }
 
-function PipelineCard({ repo, pipeline, result, status, branch, onTrigger, onStop }) {
+function PipelineCard({ repo, pipeline, result, status, branch, loading, onTrigger, onStop }) {
+  if (loading) {
+    return (
+      <div className="card pipeline-card mb-0">
+        <div className="card-body py-2 px-3">
+          <div className="d-flex justify-content-between align-items-center mb-1">
+            <div className="fw-bold">{repo}</div>
+            <div className="placeholder-glow">
+              <span className="placeholder rounded-pill bg-secondary" style={{ width: 64, height: 20, display: 'inline-block' }} />
+            </div>
+          </div>
+          <div className="placeholder-glow text-sm">
+            <span className="placeholder col-8" />
+          </div>
+          <div className="placeholder-glow mt-2">
+            <span className="placeholder col-10" style={{ height: 18, display: 'inline-block' }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const overall = status ? status.overall
     : result?.status === 'error' ? 'Error'
     : result?.status === 'triggered' ? 'InProgress'
@@ -368,17 +397,70 @@ function PipelineCard({ repo, pipeline, result, status, branch, onTrigger, onSto
           </div>
         )}
 
+        {/* Inline failure detail */}
+        {overall === 'Failed' && (() => {
+          const failedStage = stages.find(s => s.status === 'Failed');
+          const failedAction = failedStage?.actions?.find(a => a.status === 'Failed');
+          const msg = failedAction?.errorMessage;
+          const url = failedAction?.externalUrl;
+          if (!msg && !url) return null;
+          return (
+            <div className="d-flex align-items-baseline gap-1 mt-1 text-sm">
+              <i className="ti ti-alert-circle text-danger flex-shrink-0" />
+              {msg && (
+                <span className="text-danger text-truncate flex-grow-1" title={msg}>
+                  <span className="text-muted">{failedStage.name}:</span> {msg}
+                </span>
+              )}
+              {url && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-muted"
+                  title="View build logs"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <i className="ti ti-external-link" />
+                </a>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Execution history */}
         {executions.length > 0 && (
           <div className="d-flex align-items-center gap-1 mt-2">
             <span className="text-muted me-1 text-xs">Recent:</span>
-            {executions.map((ex, i) => (
-              <span
-                key={ex.id || i}
-                className={'exec-dot bg-' + (execColorMap[ex.status] || 'secondary')}
-                title={ex.status + (ex.startTime ? ' — ' + new Date(ex.startTime).toLocaleString() : '')}
-              />
-            ))}
+            {executions.map((ex, i) => {
+              const lines = [ex.status];
+              if (ex.startTime) lines.push(new Date(ex.startTime).toLocaleString());
+              if (ex.statusSummary) lines.push(ex.statusSummary);
+              const commitMsg = ex.sourceRevisions?.[0]?.revisionSummary;
+              if (commitMsg) lines.push(commitMsg.split('\n')[0]);
+              if (ex.errorMessage) lines.push(ex.errorMessage);
+              const tip = lines.join('\n');
+              const dot = <span className={'exec-dot bg-' + (execColorMap[ex.status] || 'secondary')} />;
+              return ex.externalUrl ? (
+                <a
+                  key={ex.id || i}
+                  href={ex.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={tip}
+                  onClick={e => e.stopPropagation()}
+                  style={{ lineHeight: 0 }}
+                >
+                  {dot}
+                </a>
+              ) : (
+                <span
+                  key={ex.id || i}
+                  className={'exec-dot bg-' + (execColorMap[ex.status] || 'secondary')}
+                  title={tip}
+                />
+              );
+            })}
           </div>
         )}
       </div>
