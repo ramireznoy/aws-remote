@@ -29,5 +29,6 @@ var api = (function () {
       return request('GET', url);
     },
     runCommand: (payload) => request('POST', '/api/run-command', payload),
+    getEnvVars: (env, repo) => request('GET', `/api/env-vars/${encodeURIComponent(env)}/${encodeURIComponent(repo)}`),
   };
 })();

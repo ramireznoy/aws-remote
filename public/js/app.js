@@ -1,7 +1,7 @@
 // Root App Component
 
 function App() {
-  const validTabs = ['deploy', 'multi-env', 'run-command', 'settings'];
+  const validTabs = ['deploy', 'multi-env', 'run-command', 'env-vars', 'settings'];
 
   function parseRoute(pathname) {
     const parts = pathname.replace(/^\//, '').split('/');
@@ -186,6 +186,13 @@ function App() {
                     <span className="nav-link-title">Run command</span>
                   </a>
                 </li>
+                <li className={`nav-item ${activeTab === 'env-vars' ? 'active' : ''}`}>
+                  <a className="nav-link"
+                    href="/env-vars" onClick={(e) => { e.preventDefault(); switchTab('env-vars'); }}>
+                    <span className="nav-link-icon"><i className="ti ti-key"></i></span>
+                    <span className="nav-link-title">Env vars</span>
+                  </a>
+                </li>
                 <li className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}>
                   <a className="nav-link"
                     href="/settings" onClick={(e) => { e.preventDefault(); switchTab('settings'); }}>
@@ -296,6 +303,13 @@ function App() {
               config={config}
               addToast={addToast}
               onSwitchEnvironment={switchEnvironment}
+            />
+          </div>
+          <div style={{ display: activeTab === 'env-vars' ? 'block' : 'none' }}>
+            <EnvVarsPage
+              environment={environment}
+              config={config}
+              addToast={addToast}
             />
           </div>
           <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>

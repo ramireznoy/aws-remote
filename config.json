@@ -128,10 +128,14 @@
     {
       "name": "gfs-saas-producer",
       "scripts": []
+    },
+    {
+      "name": "email-builder-backend",
+      "scripts": []
     }
   ],
-  "awsRegion": "us-gov-east-1",
-  "awsProfile": "nfip-uat",
+  "awsRegion": "us-east-1",
+  "awsProfile": "uat",
   "pollIntervalMs": 5000,
   "teamsWebhookUrl": ""
 }
